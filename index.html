@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#050506">
+<title>Plura — Multistream para Xbox</title>
+<style>
+:root{
+  --bg:#050506;
+  --bg2:#0b0b0d;
+  --card:#111114;
+  --card2:#17171b;
+  --border:#ffffff14;
+  --border-red:#e6002340;
+  --text:#f4f4f6;
+  --muted:#9b9ba4;
+  --accent:#e60023;
+  --accent-d:#b8001c;
+  --accent-l:#ff2440;
+  --accent-soft:#e6002318;
+  --ink:#0a0a0a;
+  --danger:#ff3b4e;
+  --warn:#ffb020;
+  --radius:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:
+    radial-gradient(1100px 520px at 50% -260px, #e600231f, transparent 70%),
+    var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+[hidden]{display:none !important}
+h1,h2,h3{margin:0}
+p{margin:0}
+
+.app-header{
+  position:sticky;top:0;z-index:20;
+  display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:14px 24px;
+  background:rgba(5,5,6,.9);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border-red);
+  box-shadow:0 1px 0 #e6002322, 0 12px 30px -20px #e60023;
+}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-icon{
+  width:46px;height:46px;border-radius:13px;
+  background:linear-gradient(135deg,var(--accent-l),var(--accent-d));
+  display:flex;align-items:center;justify-content:center;
+  color:#000;font-weight:900;font-size:23px;letter-spacing:-.5px;
+  box-shadow:0 6px 20px #e6002355;
+}
+.brand-text h1{font-size:20px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:#fff}
+.brand-text h1 span{color:var(--accent)}
+.brand-text p{font-size:12px;color:var(--muted);margin-top:2px}
+
+.header-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.header-btns{display:flex;gap:10px;flex-wrap:wrap}
+
+.pill{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:7px 13px;border-radius:999px;
+  font-size:12px;font-weight:800;letter-spacing:.6px;
+}
+.pill .pill-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.pill-idle{color:#a2a2ab;background:#ffffff10}
+.pill-starting{color:var(--warn);background:#ffb0201f}
+.pill-live{color:#000;background:var(--accent)}
+.pill-live .pill-dot{animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #e6002388}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.pill-error{color:#ff6b7a;background:#ff3b4e22}
+
+.btn{
+  border:1px solid transparent;border-radius:11px;padding:11px 18px;
+  font-weight:800;font-size:14px;cursor:pointer;
+  color:var(--ink);background:var(--accent);
+  transition:transform .08s ease, opacity .15s ease, background .15s ease;
+}
+.btn:hover:not(:disabled){transform:translateY(-1px);background:var(--accent-l)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn-danger{background:#1c0a0d;color:#ff6b7a;border-color:#ff3b4e55}
+.btn-danger:hover:not(:disabled){background:#2a0c11}
+.btn-ghost{background:#1a1a1f;color:var(--text);border-color:var(--border)}
+.btn-ghost:hover:not(:disabled){background:#242429}
+.btn-success{background:var(--accent);color:var(--ink)}
+.btn-xs{padding:7px 12px;font-size:12.5px;border-radius:9px}
+
+.container{
+  max-width:1060px;margin:0 auto;padding:24px 20px 70px;
+  display:flex;flex-direction:column;gap:20px;
+}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:20px;
+}
+.card h2{font-size:16px;font-weight:900;letter-spacing:.3px}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.card-head h2{margin:0}
+
+.hint{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+.obs-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-top:14px}
+
+.xbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:16px}
+.xstat{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.xstat-label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;font-weight:700}
+.xstat-value{font-size:15px;font-weight:800;margin-top:5px}
+
+.settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-top:14px}
+.field{display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--muted);font-weight:600}
+.field select,.field input{
+  background:#0a0a0c;border:1px solid var(--border);color:var(--text);
+  border-radius:10px;padding:10px 12px;font-size:14px;font-weight:600;
+  font-family:inherit;outline:none;width:100%;
+}
+.field select:focus,.field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field-check .check{display:flex;align-items:center;gap:9px;color:var(--text);font-size:13.5px;font-weight:600}
+.field-row{max-width:340px}
+
+.switch{position:relative;display:inline-block;width:48px;height:27px;flex:none}
+.switch input{opacity:0;width:0;height:0;position:absolute}
+.switch .slider{
+  position:absolute;inset:0;background:#2a2a31;border-radius:999px;
+  transition:.2s;cursor:pointer;
+}
+.switch .slider:before{
+  content:"";position:absolute;width:21px;height:21px;left:3px;top:3px;
+  background:#fff;border-radius:50%;transition:.2s;
+}
+.switch input:checked + .slider{background:var(--accent)}
+.switch input:checked + .slider:before{transform:translateX(21px)}
+.switch input:focus-visible + .slider{box-shadow:0 0 0 3px var(--accent-soft)}
+.switch-sm{width:43px;height:24px}
+.switch-sm .slider:before{width:18px;height:18px;left:3px;top:3px}
+.switch-sm input:checked + .slider:before{transform:translateX(19px)}
+.switch-lg{width:54px;height:30px}
+.switch-lg .slider:before{width:24px;height:24px;left:3px;top:3px}
+.switch-lg input:checked + .slider:before{transform:translateX(24px)}
+.switch-label{font-size:13px;color:var(--muted);font-weight:600}
+
+.master{
+  display:flex;align-items:center;gap:12px;
+  background:var(--card2);border:1px solid var(--border-red);
+  border-radius:12px;padding:10px 14px;
+}
+.master-text{display:flex;flex-direction:column;gap:1px}
+.master-text strong{font-size:13.5px;font-weight:800;color:var(--text)}
+.master-text span{font-size:11px;color:var(--muted)}
+
+.selection{
+  margin-top:14px;padding:12px 14px;border-radius:12px;
+  background:linear-gradient(90deg,var(--accent-soft),transparent);
+  border:1px solid var(--border-red);
+}
+.selection-label{font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:800}
+.selection-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:6px 12px;border-radius:999px;font-size:12px;font-weight:800;
+  background:#0a0a0c;border:1px solid var(--border-red);color:var(--text);
+}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--brand,var(--accent))}
+.chip-off{color:var(--muted);border-color:var(--border);font-weight:600}
+.selection-empty{color:var(--danger);font-size:13px;font-weight:700}
+
+.platform-list{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.platform-card{
+  background:var(--card2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:15px 16px;
+  display:flex;flex-direction:column;gap:12px;
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.platform-card.is-on{border-color:var(--border-red);box-shadow:inset 3px 0 0 var(--brand,var(--accent))}
+.pc-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.pc-id{display:flex;align-items:center;gap:12px;min-width:0}
+.pc-badge{
+  width:40px;height:40px;border-radius:11px;flex:none;
+  background:var(--brand,#888);color:var(--badgeInk,#fff);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:14px;letter-spacing:.5px;
+}
+.pc-names{min-width:0}
+.pc-name{display:block;font-weight:800;font-size:15px}
+.pc-state{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase}
+.pc-toggle-wrap{display:flex;align-items:center;gap:9px}
+.pc-toggle-text{font-size:11.5px;font-weight:800;color:var(--muted);letter-spacing:.4px;min-width:26px;text-align:right}
+.pc-toggle-text.on{color:var(--accent)}
+.pc-details{display:flex;flex-direction:column;gap:10px}
+.pc-row{display:flex;flex-direction:column;gap:6px}
+.pc-row > span{color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+.pc-key,.pc-target{
+  background:#0a0a0c;border:1px solid var(--border);color:var(--text);
+  border-radius:10px;padding:10px 12px;font-size:13.5px;font-weight:600;
+  font-family:inherit;outline:none;width:100%;
+}
+.pc-key:focus,.pc-target:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.pc-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.stat{background:#0a0a0c;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+.stat-value{font-size:16px;font-weight:800;margin-top:4px}
+
+.pc-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+
+.toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);
+  background:#141416;border:1px solid var(--border-red);color:var(--text);
+  padding:12px 18px;border-radius:12px;font-size:13.5px;font-weight:600;
+  opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90vw;text-align:center;
+  box-shadow:0 12px 40px -12px #e60023aa;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.app-footer{text-align:center;color:var(--muted);font-size:12px;padding:0 20px 46px}
+.app-footer p{margin-top:6px}
+.app-footer .plura{color:var(--accent);font-weight:900;letter-spacing:.5px}
+
+@media (max-width:640px){
+  .app-header{padding:12px 14px}
+  .container{padding:16px 12px 50px}
+  .card{padding:16px}
+  .header-btns{width:100%}
+  .header-btns .btn{flex:1}
+  .master{width:100%;justify-content:space-between}
+}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-icon" aria-hidden="true">P</div>
+    <div class="brand-text">
+      <h1>Plura<span>.</span></h1>
+      <p>Multistream para Xbox</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="pill pill-idle" id="globalStatus"><span class="pill-dot"></span><span id="globalStatusText">Detenido</span></span>
+    <div class="header-btns">
+      <button class="btn" id="btnStart">▶ Iniciar stream</button>
+      <button class="btn btn-danger" id="btnStop" disabled>■ Detener</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <section class="card">
+    <div class="card-head">
+      <h2>Consola Xbox</h2>
+      <span class="pill pill-idle" id="obsStatusPill"><span class="pill-dot"></span><span id="obsStatusText">Sin conectar OBS</span></span>
+    </div>
+    <div class="xbox-grid">
+      <div class="xstat"><div class="xstat-label">Consola</div><div class="xstat-value" id="xboxName">Xbox Series X</div></div>
+      <div class="xstat"><div class="xstat-label">Estado</div><div class="xstat-value" id="xboxState">Conectado</div></div>
+      <div class="xstat"><div class="xstat-label">Juego actual</div><div class="xstat-value" id="xboxGame">—</div></div>
+      <div class="xstat"><div class="xstat-label">Captura</div><div class="xstat-value">HDMI · OBS</div></div>
+    </div>
+    <p class="hint">Conecta la Xbox por HDMI a una tarjeta de captura y usa OBS como encoder. Plura controla OBS por WebSocket (puerto 4455).</p>
+    <div class="obs-row">
+      <label class="field"><span>Host OBS</span><input id="obsHost" value="localhost" placeholder="localhost"></label>
+      <label class="field"><span>Puerto</span><input id="obsPort" type="number" value="4455" min="1" max="65535"></label>
+      <label class="field"><span>Password</span><input id="obsPassword" type="password" value="" placeholder="••••••"></label>
+      <div class="field"><span>Acción</span><button type="button" class="btn btn-ghost" id="btnObsTest">Probar conexión</button></div>
+    </div>
+    <div class="field-row">
+      <label class="field"><span>Modelo de consola</span>
+        <select id="xboxModel">
+          <option value="Xbox Series X" selected>Xbox Series X</option>
+          <option value="Xbox Series S">Xbox Series S</option>
+          <option value="Xbox One X">Xbox One X</option>
+          <option value="Xbox One">Xbox One</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Plataformas</h2>
+      <div class="master">
+        <div class="master-text">
+          <strong>Transmitir en todas</strong>
+          <span>Activa o desactiva todas a la vez</span>
+        </div>
+        <label class="switch switch-lg" title="Activar todas las plataformas">
+          <input type="checkbox" id="masterSwitch">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    <p class="hint">Activa con cada switch las plataformas a las que quieres transmitir. Puedes elegir todas o solo algunas.</p>
+
+    <div class="selection">
+      <div class="selection-label">Vas a transmitir a</div>
+      <div class="selection-chips" id="selectionChips"></div>
+    </div>
+
+    <div id="platformList" class="platform-list"></div>
+  </section>
+
+  <section class="card">
+    <h2>Configuración de stream</h2>
+    <div class="settings-grid">
+      <label class="field"><span>Resolución</span>
+        <select id="setRes">
+          <option value="720">720p (1280×720)</option>
+          <option value="1080" selected>1080p (1920×1080)</option>
+        </select>
+      </label>
+      <label class="field"><span>FPS</span>
+        <select id="setFps">
+          <option value="30">30</option>
+          <option value="60" selected>60</option>
+        </select>
+      </label>
+      <label class="field"><span>Bitrate (kbps)</span>
+        <input id="setBitrate" type="number" min="1000" max="12000" step="250" value="4500">
+      </label>
+      <label class="field"><span>Calidad (x264 preset)</span>
+        <select id="setPreset">
+          <option value="veryfast" selected>Veryfast</option>
+          <option value="fast">Fast</option>
+          <option value="medium">Medium</option>
+          <option value="slow">Slow</option>
+        </select>
+      </label>
+      <label class="field field-check"><span>Audio</span>
+        <label class="check"><input type="checkbox" id="setAudio" checked> Micrófono activo</label>
+      </label>
+    </div>
+    <p class="hint">Los ajustes se aplican cuando inicies el stream en OBS.</p>
+  </section>
+</main>
+
+<footer class="app-footer">
+  <p><span class="plura">PLURA</span> — transmite desde tu Xbox a varias plataformas a la vez.</p>
+  <p>Conecta OBS (WebSocket en el puerto 4455) con el plugin <strong>Multiple RTMP Output</strong>.</p>
+</footer>
+
+<div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+var LS_PLATFORMS = "plura.platforms.v1";
+var LS_SETTINGS = "plura.settings.v1";
+var LS_OBS = "plura.obs.v1";
+var LS_XBOX = "plura.xbox.v1";
+
+var PLATFORMS = [
+  { id: "twitch", name: "Twitch", color: "#9146FF", short: "T", keywords: "twitch", url: "rtmp://live.twitch.tv/app/" },
+  { id: "youtube", name: "YouTube", color: "#FF0000", short: "Y", keywords: "youtube", url: "rtmp://a.rtmp.youtube.com/live2/" },
+  { id: "kick", name: "Kick", color: "#53FC18", short: "K", keywords: "kick", url: "rtmps://fa723fc1b171.global-contribute.live-video.net:443/app" },
+  { id: "facebook", name: "Facebook Gaming", color: "#1877F2", short: "FB", keywords: "facebook", url: "rtmps://live-api-s.facebook.com:443/rtmp/" },
+  { id: "tiktok", name: "TikTok", color: "#FE2C55", short: "TT", keywords: "tiktok", url: "" },
+  { id: "plura", name: "Plura", color: "#E60023", short: "P", keywords: "plura", url: "" }
+];
+
+var state = {
+  platforms: {},
+  settings: { resolution: "1080", fps: 60, bitrate: 4500, preset: "veryfast", audio: true },
+  obs: { host: "localhost", port: 4455, password: "", connected: false },
+  xbox: { model: "Xbox Series X" }
+};
+var els = {};
+var busy = false;
+
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function toast(msg) { var t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._tm); toast._tm = setTimeout(function () { t.classList.remove("show"); }, 2600); }
+function statusLabel(s) { if (s === "live") return "EN VIVO"; if (s === "starting") return "Conectando"; if (s === "error") return "Error"; return "Lista"; }
+function statusPill(s) { if (s === "live") return "pill-live"; if (s === "starting") return "pill-starting"; if (s === "error") return "pill-error"; return "pill-idle"; }
+function isActive(st) { return st.status === "live" || st.status === "starting"; }
+function fmtBitrate(bps) { if (!bps) return "—"; var kbps = bps / 1000; if (kbps >= 1000) { return (kbps / 1000).toFixed(2) + " Mbps"; } return Math.round(kbps) + " kbps"; }
+function fmtDur(ms) { var s = Math.max(0, Math.floor((ms || 0) / 1000)); var h = Math.floor(s / 3600); var m = Math.floor((s % 3600) / 60); var sec = s % 60; var mm = (m < 10 ? "0" : "") + m; var ss = (sec < 10 ? "0" : "") + sec; return h > 0 ? h + ":" + mm + ":" + ss : mm + ":" + ss; }
+
+function initPlatforms() {
+  PLATFORMS.forEach(function (p) {
+    state.platforms[p.id] = { enabled: false, key: "", url: p.url, targetName: p.name, obsId: "", status: "idle", startedAt: 0, stats: { bitrate_bps: 0, fps: 0 } };
+  });
+}
+function migrateLegacy() {
+  try {
+    if (!localStorage.getItem(LS_PLATFORMS) && localStorage.getItem("xms.platforms.v1")) { localStorage.setItem(LS_PLATFORMS, localStorage.getItem("xms.platforms.v1")); }
+    if (!localStorage.getItem(LS_SETTINGS) && localStorage.getItem("xms.settings.v1")) { localStorage.setItem(LS_SETTINGS, localStorage.getItem("xms.settings.v1")); }
+    if (!localStorage.getItem(LS_OBS) && localStorage.getItem("xms.obs.v1")) { localStorage.setItem(LS_OBS, localStorage.getItem("xms.obs.v1")); }
+    if (!localStorage.getItem(LS_XBOX) && localStorage.getItem("xms.xbox.v1")) { localStorage.setItem(LS_XBOX, localStorage.getItem("xms.xbox.v1")); }
+  } catch (e) {}
+}
+function loadState() {
+  migrateLegacy();
+  try { var p = JSON.parse(localStorage.getItem(LS_PLATFORMS)); if (p) { PLATFORMS.forEach(function (pl) { if (p[pl.id]) { state.platforms[pl.id] = Object.assign({}, state.platforms[pl.id], p[pl.id], { status: "idle", startedAt: 0 }); } }); } } catch (e) {}
+  try { var s = JSON.parse(localStorage.getItem(LS_SETTINGS)); if (s) { state.settings = Object.assign(state.settings, s); } } catch (e) {}
+  try { var o = JSON.parse(localStorage.getItem(LS_OBS)); if (o) { state.obs = Object.assign(state.obs, o, { connected: false }); } } catch (e) {}
+  try { var x = JSON.parse(localStorage.getItem(LS_XBOX)); if (x && x.model) { state.xbox = { model: x.model }; } } catch (e) {}
+}
+function saveAll() { try { localStorage.setItem(LS_PLATFORMS, JSON.stringify(state.platforms)); localStorage.setItem(LS_SETTINGS, JSON.stringify(state.settings)); localStorage.setItem(LS_OBS, JSON.stringify(state.obs)); localStorage.setItem(LS_XBOX, JSON.stringify(state.xbox)); } catch (e) {} }
+
+/* ---------------- OBS WebSocket + Vendor (Multiple RTMP) ---------------- */
+var ws = null;
+var obsConnected = false;
+var obsConnecting = false;
+var obsConnectPromise = null;
+var pendingReqs = {};
+var obsSeq = 1000;
+var AUTH_ID = 900001;
+
+function obsSend(args) {
+  return new Promise(function (resolve, reject) {
+    if (!ws || ws.readyState !== 1) { reject(new Error("OBS no está conectado")); return; }
+    var id = obsSeq++;
+    var entry = { resolve: resolve, reject: reject, timer: setTimeout(function () { var p = pendingReqs[id]; if (p) { delete pendingReqs[id]; p.reject(new Error("Timeout")); } }, 6000) };
+    pendingReqs[id] = entry;
+    try { ws.send(JSON.stringify({ id: id, op: 1, args: args })); } catch (err) { clearTimeout(entry.timer); delete pendingReqs[id]; reject(err); }
+  });
+}
+function obsCall(command, args) { return obsSend(Object.assign({ command: command }, args || {})); }
+function obsVendor(requestType, requestData) { return obsCall("CallVendorRequest", { vendorName: "sorayuki.multi_rtmp", requestType: requestType, requestData: requestData || {} }); }
+function vendorData(res) { return (res && res.responseData) ? res.responseData : (res || {}); }
+
+function obsConnect() {
+  if (obsConnected && ws && ws.readyState === 1) { return Promise.resolve(); }
+  if (obsConnectPromise) { return obsConnectPromise; }
+  obsConnecting = true;
+  obsConnectPromise = new Promise(function (resolve, reject) {
+    var ws2;
+    try { ws2 = new WebSocket("ws://" + state.obs.host + ":" + state.obs.port); } catch (e) { obsConnecting = false; obsConnectPromise = null; reject(new Error("Host o puerto inválido")); return; }
+    ws = ws2;
+    var settled = false;
+    var to = setTimeout(function () { if (!settled) { settled = true; obsConnecting = false; obsConnectPromise = null; try { ws2.close(); } catch (e) {} reject(new Error("Sin respuesta de OBS (timeout)")); } }, 9000);
+    function finish(err, ok) {
+      if (settled) { return; }
+      settled = true; clearTimeout(to); obsConnecting = false; obsConnectPromise = null; obsConnected = !!ok;
+      if (err) { try { ws2.close(); } catch (e) {} reject(err); } else { resolve(ok); }
+    }
+    ws2.onopen = function () { try { ws2.send(JSON.stringify({ id: AUTH_ID, op: 0, args: { message: "Connect", password: state.obs.password } })); } catch (e) { finish(e); } };
+    ws2.onmessage = function (ev) {
+      var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.id === AUTH_ID) { if (m.args && m.args.success) { finish(null, true); } else { finish(new Error("Autenticación rechazada")); } return; }
+      if (m.id && pendingReqs[m.id]) { var p = pendingReqs[m.id]; delete pendingReqs[m.id]; clearTimeout(p.timer); p.resolve(m.args || { success: true }); }
+    };
+    ws2.onerror = function () { finish(new Error("Error de conexión WebSocket")); };
+    ws2.onclose = function () { obsConnected = false; if (!settled) { finish(new Error("Conexión cerrada por OBS")); } };
+  });
+  return obsConnectPromise;
+}
+
+function targetRef(pid) { var st = state.platforms[pid]; return st.obsId ? { id: st.obsId } : { name: st.targetName }; }
+function obsStartTarget(pid) { return obsVendor("start_target", targetRef(pid)); }
+function obsStopTarget(pid) { return obsVendor("stop_target", targetRef(pid)); }
+function obsGetTargetState(pid) { return obsVendor("get_target_state", targetRef(pid)); }
+function obsGetTargetStats(pid) { return obsVendor("get_target_stats", targetRef(pid)); }
+
+async function obsListTargets() {
+  var res = await obsVendor("list_targets");
+  var rd = vendorData(res);
+  var targets = rd.targets || [];
+  PLATFORMS.forEach(function (p) {
+    var st = state.platforms[p.id];
+    var found = null;
+    for (var i = 0; i < targets.length; i++) {
+      var t = targets[i] || {};
+      if ((t.name || "").toLowerCase().indexOf(p.keywords) > -1) { found = t; break; }
+    }
+    st.obsId = found ? (found.id || "") : "";
+  });
+}
+
+var obsTimer = null;
+function startObsPolling() { if (obsTimer) { return; } obsTimer = setInterval(function () { pollTargets(); }, 2000); }
+async function pollTargets() {
+  if (!obsConnected) { return; }
+  for (var i = 0; i < PLATFORMS.length; i++) {
+    var p = PLATFORMS[i];
+    var st = state.platforms[p.id];
+    try {
+      var r = await obsGetTargetState(p.id);
+      var rd = vendorData(r);
+      if (rd && typeof rd.streaming !== "undefined") {
+        if (rd.streaming) {
+          if (st.status !== "live") { st.status = "live"; st.startedAt = Date.now(); }
+          st.stats.bitrate_bps = rd.bitrate_bps || st.stats.bitrate_bps || 0;
+          st.stats.fps = rd.fps || st.stats.fps || 0;
+          try {
+            var rs = await obsGetTargetStats(p.id);
+            var rds = vendorData(rs);
+            if (rds && typeof rds.streaming !== "undefined" && rds.streaming) {
+              st.stats.bitrate_bps = rds.bitrate_bps || st.stats.bitrate_bps || 0;
+              st.stats.fps = rds.fps || st.stats.fps || 0;
+            }
+          } catch (e) {}
+        } else if (st.status === "live" || st.status === "starting") {
+          st.status = "idle"; st.startedAt = 0; st.stats = { bitrate_bps: 0, fps: 0 };
+        }
+      }
+    } catch (e) { /* target no disponible todavía */ }
+  }
+  refreshUI();
+}
+
+async function startPlatforms(ids) {
+  var list = [];
+  PLATFORMS.forEach(function (p) {
+    var st = state.platforms[p.id];
+    var selected = ids == null || ids.indexOf(p.id) > -1;
+    if (selected && st.enabled && st.key && st.key.trim()) { list.push(p); }
+  });
+  if (!list.length) { toast("Activa al menos una plataforma y pega su Stream Key."); return false; }
+  setBusy(true);
+  try { await obsConnect(); } catch (e) { setBusy(false); toast("No se pudo conectar a OBS: " + e.message); return false; }
+  try { await obsListTargets(); } catch (e) { /* se sigue con los nombres */ }
+  for (var i = 0; i < list.length; i++) {
+    var p = list[i];
+    var st = state.platforms[p.id];
+    st.status = "starting";
+    refreshUI();
+    try {
+      var r = await obsStartTarget(p.id);
+      var rd = vendorData(r);
+      if (rd && rd.status && String(rd.status).toLowerCase().indexOf("error") > -1) { st.status = "error"; toast(p.name + ": OBS respondió " + rd.status); }
+      else { st.status = "live"; st.startedAt = Date.now(); }
+    } catch (e) { st.status = "error"; toast(p.name + ": " + e.message); }
+  }
+  setBusy(false);
+  startObsPolling();
+  refreshUI();
+  return true;
+}
+async function stopOne(pid) {
+  var st = state.platforms[pid];
+  if (!isActive(st)) { return; }
+  st.status = "idle"; st.startedAt = 0; st.stats = { bitrate_bps: 0, fps: 0 }; refreshUI();
+  try { await obsConnect(); await obsStopTarget(pid); } catch (e) { /* noop */ }
+  refreshUI();
+}
+async function stopAllStreams() {
+  var act = PLATFORMS.filter(function (p) { return isActive(state.platforms[p.id]); });
+  if (!act.length) { return; }
+  try { await obsConnect(); } catch (e) { toast("No se pudo conectar a OBS: " + e.message); return; }
+  for (var i = 0; i < act.length; i++) {
+    var p = act[i];
+    state.platforms[p.id].status = "idle";
+    state.platforms[p.id].startedAt = 0;
+    state.platforms[p.id].stats = { bitrate_bps: 0, fps: 0 };
+    try { await obsStopTarget(p.id); } catch (e) { /* noop */ }
+  }
+  refreshUI();
+}
+async function testObsConnection() {
+  try {
+    await obsConnect();
+    $("obsStatusPill").className = "pill pill-live";
+    $("obsStatusText").textContent = "Conectado · " + state.obs.host + ":" + state.obs.port;
+    toast("Conexión OBS establecida.");
+    return true;
+  } catch (e) {
+    $("obsStatusPill").className = "pill pill-error";
+    $("obsStatusText").textContent = "Sin conexión";
+    toast("No se pudo conectar a OBS: " + e.message);
+    return false;
+  }
+}
+
+/* ---------------- Render / estado UI ---------------- */
+function buildCards() {
+  var container = $("platformList");
+  container.innerHTML = "";
+  PLATFORMS.forEach(function (p) {
+    var st = state.platforms[p.id];
+    var card = document.createElement("div");
+    card.className = "platform-card";
+    card.style.setProperty("--brand", p.color);
+    card.innerHTML =
+      '<div class="pc-top">' +
+        '<div class="pc-id"><span class="pc-badge" style="--brand:' + p.color + '; --badgeInk:' + (p.id === "plura" ? "#000000" : "#FFFFFF") + '">' + p.short + '</span>' +
+          '<div class="pc-names"><span class="pc-name">' + p.name + '</span><span class="pc-state pill ' + statusPill(st.status) + '">' + statusLabel(st.status) + '</span></div>' +
+        '</div>' +
+        '<div class="pc-toggle-wrap">' +
+          '<span class="pc-toggle-text' + (st.enabled ? " on" : "") + '">' + (st.enabled ? "SÍ" : "NO") + '</span>' +
+          '<label class="switch switch-sm" title="Transmitir a ' + p.name + '"><input type="checkbox" class="pc-toggle" data-pid="' + p.id + '"' + (st.enabled ? " checked" : "") + '><span class="slider"></span></label>' +
+        '</div>' +
+      '</div>' +
+      '<div class="pc-details">' +
+        '<div class="pc-row"><span>Stream Key</span><input type="password" class="pc-key" data-pid="' + p.id + '" value="' + esc(st.key) + '" placeholder="Pega tu stream key aquí"></div>' +
+        '<div class="pc-row"><span>Target en OBS</span><input class="pc-target" data-pid="' + p.id + '" value="' + esc(st.targetName) + '"></div>' +
+        '<div class="pc-stats" data-stats="' + p.id + '" hidden>' +
+          '<div class="stat"><div class="stat-label">Bitrate</div><div class="stat-value stat-bitrate">—</div></div>' +
+          '<div class="stat"><div class="stat-label">FPS</div><div class="stat-value stat-fps">—</div></div>' +
+          '<div class="stat"><div class="stat-label">Resolución</div><div class="stat-value stat-res">—</div></div>' +
+          '<div class="stat"><div class="stat-label">Duración</div><div class="stat-value stat-dur">—</div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="pc-actions">' +
+        '<button type="button" class="btn btn-xs btn-success" data-start="' + p.id + '">▶ Iniciar</button>' +
+        '<button type="button" class="btn btn-xs btn-danger" data-stop="' + p.id + '" disabled>■ Detener</button>' +
+      '</div>';
+    container.appendChild(card);
+    els[p.id] = {
+      el: card,
+      toggle: card.querySelector(".pc-toggle"),
+      toggleText: card.querySelector(".pc-toggle-text"),
+      key: card.querySelector(".pc-key"),
+      target: card.querySelector(".pc-target"),
+      state: card.querySelector(".pc-state"),
+      stats: card.querySelector("[data-stats]"),
+      start: card.querySelector("[data-start]"),
+      stop: card.querySelector("[data-stop]")
+    };
+  });
+}
+
+function renderSelection() {
+  var chips = $("selectionChips");
+  var on = PLATFORMS.filter(function (p) { return state.platforms[p.id].enabled; });
+  chips.innerHTML = "";
+  if (!on.length) {
+    chips.innerHTML = '<span class="selection-empty">Ninguna plataforma seleccionada. Activa al menos un switch.</span>';
+    return;
+  }
+  on.forEach(function (p) {
+    var chip = document.createElement("span");
+    chip.className = "chip";
+    chip.innerHTML = '<span class="dot" style="--brand:' + p.color + '"></span>' + p.name;
+    chips.appendChild(chip);
+  });
+  var off = PLATFORMS.filter(function (p) { return !state.platforms[p.id].enabled; });
+  off.forEach(function (p) {
+    var chip = document.createElement("span");
+    chip.className = "chip chip-off";
+    chip.innerHTML = '<span class="dot" style="--brand:#555"></span>' + p.name;
+    chips.appendChild(chip);
+  });
+}
+
+function refreshUI() {
+  $("xboxModel").value = state.xbox.model;
+
+  var enabledCount = 0;
+  PLATFORMS.forEach(function (p) { if (state.platforms[p.id].enabled) { enabledCount++; } });
+  var master = $("masterSwitch");
+  master.checked = enabledCount === PLATFORMS.length;
+  master.indeterminate = enabledCount > 0 && enabledCount < PLATFORMS.length;
+
+  renderSelection();
+
+  var liveList = [];
+  var hasStarting = false;
+  PLATFORMS.forEach(function (p) {
+    var st = state.platforms[p.id];
+    if (st.status === "live") { liveList.push(p.name); }
+    if (st.status === "starting") { hasStarting = true; }
+  });
+
+  var gs = $("globalStatus");
+  if (liveList.length) { gs.className = "pill pill-live"; $("globalStatusText").textContent = "EN VIVO · " + liveList.join(" + "); }
+  else if (hasStarting) { gs.className = "pill pill-starting"; $("globalStatusText").textContent = "Transmitiendo…"; }
+  else { gs.className = "pill pill-idle"; $("globalStatusText").textContent = "Detenido"; }
+
+  var anyActive = false;
+  var anyReady = false;
+  PLATFORMS.forEach(function (p) {
+    var st = state.platforms[p.id];
+    var active = isActive(st);
+    if (active) { anyActive = true; }
+    if (st.enabled && st.key && st.key.trim()) { anyReady = true; }
+    var e = els[p.id];
+    if (!e) { return; }
+    e.toggle.checked = !!st.enabled;
+    e.toggleText.textContent = st.enabled ? "SÍ" : "NO";
+    e.toggleText.className = "pc-toggle-text" + (st.enabled ? " on" : "");
+    e.el.className = "platform-card" + (st.enabled ? " is-on" : "");
+    e.start.disabled = !(st.enabled && st.key && st.key.trim());
+    e.stop.disabled = !active;
+    if (st.status === "live") {
+      e.stats.hidden = false;
+      e.stats.querySelector(".stat-bitrate").textContent = fmtBitrate(st.stats.bitrate_bps);
+      e.stats.querySelector(".stat-fps").textContent = (st.stats.fps ? st.stats.fps + " fps" : "—");
+      e.stats.querySelector(".stat-res").textContent = (state.settings.resolution === "720" ? "720p" : "1080p") + " · " + state.settings.fps + " fps";
+      e.stats.querySelector(".stat-dur").textContent = fmtDur(Date.now() - st.startedAt);
+    } else { e.stats.hidden = true; }
+    var pill = e.state;
+    pill.className = "pc-state pill " + statusPill(st.status);
+    pill.textContent = statusLabel(st.status);
+  });
+  $("btnStop").disabled = !anyActive;
+  $("btnStart").disabled = busy || !anyReady;
+  $("xboxName").textContent = state.xbox.model;
+}
+
+/* ---------------- Eventos ---------------- */
+function setAllEnabled(v) { PLATFORMS.forEach(function (p) { state.platforms[p.id].enabled = v; }); saveAll(); refreshUI(); }
+
+function buildCardsAndBind() {
+  buildCards();
+  var list = $("platformList");
+  list.addEventListener("change", function (e) {
+    var pid = e.target.getAttribute ? e.target.getAttribute("data-pid") : null;
+    if (!pid) { return; }
+    if (e.target.classList && e.target.classList.contains("pc-toggle")) { state.platforms[pid].enabled = e.target.checked; saveAll(); refreshUI(); }
+    else if (e.target.classList && e.target.classList.contains("pc-key")) { state.platforms[pid].key = e.target.value; saveAll(); refreshUI(); }
+    else if (e.target.classList && e.target.classList.contains("pc-target")) { state.platforms[pid].targetName = e.target.value; saveAll(); }
+  });
+  list.addEventListener("input", function (e) {
+    var pid = e.target.getAttribute ? e.target.getAttribute("data-pid") : null;
+    if (!pid) { return; }
+    if (e.target.classList && e.target.classList.contains("pc-key")) { state.platforms[pid].key = e.target.value; saveAll(); refreshUI(); }
+    else if (e.target.classList && e.target.classList.contains("pc-target")) { state.platforms[pid].targetName = e.target.value; saveAll(); }
+  });
+  list.addEventListener("click", function (e) {
+    var btn = e.target.closest ? e.target.closest("[data-start],[data-stop]") : null;
+    if (!btn) { return; }
+    if (btn.getAttribute("data-start")) { startPlatforms([btn.getAttribute("data-start")]); }
+    else { stopOne(btn.getAttribute("data-stop")); }
+  });
+  $("masterSwitch").addEventListener("change", function (e) { setAllEnabled(e.target.checked); });
+  $("btnStart").addEventListener("click", function () { startPlatforms(null); });
+  $("btnStop").addEventListener("click", function () { stopAllStreams(); });
+  $("btnObsTest").addEventListener("click", function () { testObsConnection().then(function (ok) { if (ok) { startObsPolling(); } }); });
+}
+
+function bindSettings() {
+  $("setRes").addEventListener("change", function (e) { state.settings.resolution = e.target.value; saveAll(); refreshUI(); });
+  $("setFps").addEventListener("change", function (e) { state.settings.fps = parseInt(e.target.value) || 60; saveAll(); refreshUI(); });
+  $("setBitrate").addEventListener("change", function (e) { state.settings.bitrate = parseInt(e.target.value) || 4500; saveAll(); });
+  $("setPreset").addEventListener("change", function (e) { state.settings.preset = e.target.value; saveAll(); });
+  $("setAudio").addEventListener("change", function (e) { state.settings.audio = e.target.checked; saveAll(); });
+  $("obsHost").addEventListener("change", function (e) { state.obs.host = e.target.value.trim(); saveAll(); });
+  $("obsPort").addEventListener("change", function (e) { state.obs.port = parseInt(e.target.value) || 4455; saveAll(); });
+  $("obsPassword").addEventListener("change", function (e) { state.obs.password = e.target.value; saveAll(); });
+  $("xboxModel").addEventListener("change", function (e) { state.xbox.model = e.target.value; saveAll(); refreshUI(); });
+}
+
+function setBusy(v) { busy = v; refreshUI(); }
+
+/* ---------------- Init ---------------- */
+function init() {
+  initPlatforms();
+  loadState();
+  buildCardsAndBind();
+  bindSettings();
+
+  $("setRes").value = state.settings.resolution;
+  $("setFps").value = String(state.settings.fps);
+  $("setBitrate").value = state.settings.bitrate;
+  $("setPreset").value = state.settings.preset;
+  $("setAudio").checked = !!state.settings.audio;
+  $("obsHost").value = state.obs.host;
+  $("obsPort").value = state.obs.port;
+  $("obsPassword").value = state.obs.password;
+
+  setInterval(function () {
+    PLATFORMS.forEach(function (p) {
+      var st = state.platforms[p.id];
+      var e = els[p.id];
+      if (st.status === "live" && e && !e.stats.hidden) {
+        e.stats.querySelector(".stat-dur").textContent = fmtDur(Date.now() - st.startedAt);
+      }
+    });
+  }, 1000);
+  refreshUI();
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

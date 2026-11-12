@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="Plura.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <SolidColorBrush x:Key="PluraBackgroundBrush" Color="#FF050506" />
+        <SolidColorBrush x:Key="PluraCardBrush" Color="#FF111114" />
+        <SolidColorBrush x:Key="PluraAccentBrush" Color="#FFE60023" />
+        <SolidColorBrush x:Key="PluraTextBrush" Color="#FFF4F4F6" />
+        <SolidColorBrush x:Key="PluraMutedBrush" Color="#FF9B9BA4" />
+    </Application.Resources>
+</Application>

@@ -1,0 +1,14 @@
+{
+  "name": "plura-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend de referencia para vincular cuentas y entregar credenciales RTMP a Plura",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
