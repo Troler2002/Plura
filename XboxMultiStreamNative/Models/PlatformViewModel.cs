@@ -286,6 +286,7 @@ namespace Plura.Models
                 if (Set(ref _isConfigOpen, value))
                 {
                     Raise(nameof(ConfigVisibility));
+                    Raise(nameof(SettingsVisibility));
                 }
             }
         }
@@ -466,6 +467,36 @@ namespace Plura.Models
             get { return _isConfigOpen ? Visibility.Visible : Visibility.Collapsed; }
         }
 
+        /// <summary>La clave se muestra siempre en los destinos; Twitch es el origen.</summary>
+        public Visibility SettingsVisibility
+        {
+            get { return IsOrigin ? Visibility.Collapsed : Visibility.Visible; }
+        }
+
+        public Visibility ConfigButtonVisibility
+        {
+            get { return Visibility.Collapsed; }
+        }
+
+        /// <summary>Pista concreta de dónde sacar la Stream Key de cada red.</summary>
+        public string StreamKeyHint
+        {
+            get
+            {
+                switch ((Id ?? string.Empty).ToLowerInvariant())
+                {
+                    case "youtube":
+                        return "Pega solo la clave · YouTube Studio → Transmitir → Clave de transmisión.";
+                    case "kick":
+                        return "Pega solo la clave · Kick → Configuración → Stream Key.";
+                    case "facebook":
+                        return "Pega solo la clave · Facebook Live Producer → Clave de transmisión.";
+                    default:
+                        return "Pega solo la clave desde el panel de la plataforma.";
+                }
+            }
+        }
+
         // --------------------------------------------------- modo consola
 
         /// <summary>En modo consola Twitch es el origen, no un destino.</summary>
@@ -519,6 +550,8 @@ namespace Plura.Models
             Raise(nameof(ActionsVisibility));
             Raise(nameof(OriginVisibility));
             Raise(nameof(ObsOnlyVisibility));
+            Raise(nameof(SettingsVisibility));
+            Raise(nameof(ConfigButtonVisibility));
             Raise(nameof(StatusLabel));
             Raise(nameof(StatusText));
             Raise(nameof(StatusBackground));

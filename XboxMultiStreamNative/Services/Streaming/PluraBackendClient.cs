@@ -14,8 +14,8 @@ namespace Plura.Services.Streaming
     }
 
     /// <summary>
-    /// Cliente del backend de Plura. El backend guarda los secretos OAuth y
-    /// los refresh tokens; la app solo maneja un token de sesión de corta vida.
+    /// Cliente del backend de Plura. La app solo maneja un token de sesión
+    /// anónimo; las credenciales de cada plataforma son Stream Keys manuales.
     /// </summary>
     public sealed class PluraBackendClient
     {
@@ -63,16 +63,13 @@ namespace Plura.Services.Streaming
 
         public Task<JsonObject> GetAsync(string path, CancellationToken token)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, BuildUrl(path));
-            return SendAsync(request, token);
+            return SendAsync(HttpMethod.Get, path, null, token, true);
         }
 
         public Task<JsonObject> PostAsync(string path, JsonObject body, CancellationToken token)
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(path));
             var json = (body ?? new JsonObject()).Stringify();
-            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            return SendAsync(request, token);
+            return SendAsync(HttpMethod.Post, path, json, token, true);
         }
 
         /// <summary>
@@ -91,17 +88,23 @@ namespace Plura.Services.Streaming
             }
         }
 
-        private async Task<JsonObject> SendAsync(HttpRequestMessage request, CancellationToken token)
+        private async Task<JsonObject> SendAsync(
+            HttpMethod method, string path, string body, CancellationToken token, bool allowSessionRetry)
         {
             if (string.IsNullOrWhiteSpace(BaseUrl))
             {
-                request.Dispose();
                 throw new BackendException(
-                    "Configura la URL del backend de Plura para conectar cuentas.");
+                    "Configura la URL del backend de Plura en «Backend de Plura».");
             }
 
-            using (request)
+            var url = BuildUrl(path);
+            using (var request = new HttpRequestMessage(method, url))
             {
+                if (body != null)
+                {
+                    request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                }
+
                 var session = SessionToken;
                 if (!string.IsNullOrEmpty(session))
                 {
@@ -113,14 +116,21 @@ namespace Plura.Services.Streaming
                 {
                     response = await Http.SendAsync(request, token);
                 }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    throw;
+                }
                 catch (OperationCanceledException)
                 {
-                    throw new BackendException("El backend no respondió a tiempo.");
+                    throw new BackendException(
+                        "El backend en " + DescribeBaseUrl() + " no respondió a tiempo.");
                 }
                 catch (Exception ex)
                 {
                     throw new BackendException(
-                        "No se pudo conectar con el backend: " + ex.Message, ex);
+                        "No se pudo conectar con el backend en " + DescribeBaseUrl() +
+                        ". Enciende el backend en el PC y comprueba que la consola está en la misma red. (" +
+                        ex.Message + ")", ex);
                 }
 
                 using (response)
@@ -141,6 +151,18 @@ namespace Plura.Services.Streaming
                         JsonObject.TryParse(text, out json);
                     }
 
+                    // Si el backend se reinició o borró sus datos, el token
+                    // guardado deja de valer. Se pide una sesión nueva y se
+                    // reintenta una sola vez para no dejar la app bloqueada.
+                    if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized &&
+                        allowSessionRetry &&
+                        !string.Equals(path, "/v1/session", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SessionToken = string.Empty;
+                        await EnsureSessionAsync(token);
+                        return await SendAsync(method, path, body, token, false);
+                    }
+
                     if (!response.IsSuccessStatusCode)
                     {
                         var message = json != null ? GetString(json, "error", null) : null;
@@ -155,6 +177,17 @@ namespace Plura.Services.Streaming
                     return json ?? new JsonObject();
                 }
             }
+        }
+
+        private string DescribeBaseUrl()
+        {
+            var root = (BaseUrl ?? string.Empty).Trim();
+            if (root.Length == 0) { return "(sin URL)"; }
+            if (root.IndexOf("://", StringComparison.Ordinal) < 0)
+            {
+                root = "http://" + root;
+            }
+            return root.TrimEnd('/');
         }
 
         private string BuildUrl(string path)

@@ -1,19 +1,38 @@
 # Plura backend (referencia)
 
-Backend local para el **modo Conectar cuenta** y el **modo consola** de la app de
-Xbox. Guarda los tokens OAuth, entrega a Plura una **URL de servidor RTMP** y una
-**Stream Key**, y en modo consola recibe la emisión nativa de Twitch y la reparte
-al resto de plataformas con ffmpeg.
+Backend local para el **modo consola** de la app de Xbox. Recibe la emisión nativa de
+Twitch y la reparte al resto de plataformas con ffmpeg usando la **Stream Key** que la
+app envía en cada petición.
+
+La app **no usa cuentas ni OAuth**: solo crea una sesión, envía el canal y las claves de
+los destinos, y consulta el estado del relay. Las rutas de vinculación/OAuth siguen en
+este backend de referencia por compatibilidad, pero la app no las llama.
 
 - **Sin dependencias**: solo Node.js 18 o superior (`node:http`, `node:crypto`,
   `fetch` nativo).
-- **Sin WebView**: la vinculación usa un código de dispositivo que el usuario
-  confirma en el navegador; la app solo consulta el estado.
-- **Mismo contrato para todo**: manual, OAuth de dispositivo y OAuth con
-  redirección producen `{ serverUrl, streamKey }`.
-- **Relay opcional**: requiere **ffmpeg** instalado en la máquina del backend.
+- **Relay**: requiere **ffmpeg** instalado en la máquina del backend.
+- **Solo Stream Key**: las credenciales de destino llegan en `POST /v1/relay/start`.
 
 ## Arrancar
+
+La forma recomendada es el lanzador, que encuentra Node y ffmpeg y **reinicia
+el backend automáticamente** si se cae:
+
+```powershell
+cd server
+.\start-backend.cmd
+```
+
+También se puede ejecutar el script directamente:
+
+```powershell
+.\start-backend.ps1            # bucle de reinicio
+.\start-backend.ps1 -Once      # una sola vez, sin reinicio
+```
+
+Para que arranque solo al iniciar sesión en Windows hay una tarea programada
+llamada **PluraBackend** (se puede ver en el Programador de tareas). Si se
+prefiere arrancar a mano:
 
 ```powershell
 cd server
@@ -22,7 +41,10 @@ node src/index.js
 ```
 
 El servidor escucha en `0.0.0.0:8787` y muestra por consola las direcciones LAN.
-En la app de Xbox: **Backend** → `http://IP-DEL-PC:8787` → **Probar**.
+En la app de Xbox: **Backend de Plura** → `http://IP-DEL-PC:8787` → **Probar backend**.
+
+Si el backend no está encendido, la app muestra **SIN BACKEND** y explica cómo
+arrancarlo; el relay no se puede iniciar hasta que la consola vuelva a conectar.
 
 Variables de entorno útiles:
 
@@ -69,10 +91,14 @@ Variables de entorno útiles:
 | `POST` | `/v1/relay/start` | Bearer | `{ channel, outputs: [{ platform, serverUrl, streamKey }] }` |
 | `POST` | `/v1/relay/stop` | Bearer | `{ running: false }` |
 | `GET` | `/v1/relay/channel?login=` | Bearer | `{ login, displayName, live, title, viewers }` |
-| `GET` | `/v1/twitch/channel` | Bearer | Canal de la cuenta de Twitch vinculada |
-| `GET` | `/link?code=` | — | Página de vinculación |
-| `POST` | `/link/confirm` | — | Formulario del modo manual |
-| `GET` | `/oauth/callback/:provider` | — | Retorno de Kick/Facebook |
+| `GET` | `/v1/twitch/channel` | Bearer | Canal vinculado (legado, la app no lo usa) |
+| `GET` | `/link?code=` | — | Página de vinculación (legado) |
+| `POST` | `/link/confirm` | — | Formulario del modo manual (legado) |
+| `GET` | `/oauth/callback/:provider` | — | Retorno de Kick/Facebook (legado) |
+
+> La app de Xbox usa únicamente `/v1/session`, `/v1/relay/*` y
+> `/v1/relay/channel`. Las rutas `/v1/link/*`, `/v1/ingest/*` y `/oauth/*` son
+> legado del backend de referencia y no forman parte del flujo de la app.
 
 Cuerpo de `POST /v1/link/start`:
 

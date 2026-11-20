@@ -7,10 +7,14 @@ using System.Threading.Tasks;
 using Plura.Models;
 using Plura.Services;
 using Plura.Services.Streaming;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Data.Json;
+using Windows.Storage.Streams;
 using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Media.Imaging;
 
 namespace Plura
 {
@@ -20,7 +24,6 @@ namespace Plura
         private readonly SettingsStore _store = new SettingsStore();
         private readonly SecureStore _secure = new SecureStore("Plura");
         private readonly PluraBackendClient _backend;
-        private readonly LinkCodeAuthService _auth;
         private readonly OAuthCredentialProvider _oauth;
         private readonly CredentialResolver _resolver;
         private readonly ObsMultiRtmpSink _sink;
@@ -46,6 +49,20 @@ namespace Plura
         private int _channelTicks;
         private RelayStatus _relayStatus;
         private RelayChannelInfo _channelInfo;
+        private string _channelAvatarUrl = string.Empty;
+        private readonly List<Uri> _avatarFallbacks = new List<Uri>();
+
+        // Se espera a que el usuario deje de escribir antes de consultar el
+        // canal: así no se comprueban nombres a medio escribir.
+        private readonly DispatcherTimer _channelTimer;
+        private DateTime _channelEditAt = DateTime.MinValue;
+
+        // El canal y las Stream Keys se guardan también en el backend para que
+        // no se pierdan al reinstalar o actualizar la app en la consola.
+        private readonly DispatcherTimer _settingsTimer;
+        private bool _settingsPulled;
+        private bool _settingsPulling;
+        private bool _applyingRemoteSettings;
 
         public MainPage()
         {
@@ -57,7 +74,6 @@ namespace Plura
                 SelectionChips = new ObservableCollection<SelectionChip>();
 
                 _backend = new PluraBackendClient(_secure);
-                _auth = new LinkCodeAuthService(_backend);
                 _oauth = new OAuthCredentialProvider(_backend);
                 _resolver = new CredentialResolver(_oauth);
                 _sink = new ObsMultiRtmpSink(_obs);
@@ -95,14 +111,14 @@ namespace Plura
 
         private void CreatePlatforms()
         {
-            // Servidores de ingesta oficiales. TikTok y Plura no tienen una URL
-            // fija: TikTok la da por cuenta/región y Plura es tu propio servidor.
+            // Solo redes que emiten con una Stream Key sobre un servidor de ingesta
+            // fijo. TikTok (URL por cuenta/región) y Plura (servidor propio) no
+            // encajan en el flujo de una sola clave y se han retirado.
+            // Twitch es el origen: la Xbox emite ahí con su función nativa.
             AddPlatform("twitch", "Twitch", "T", "#9146FF", "rtmp://live.twitch.tv/app/", false);
             AddPlatform("youtube", "YouTube", "Y", "#FF0000", "rtmp://a.rtmp.youtube.com/live2/", false);
             AddPlatform("kick", "Kick", "K", "#53FC18", "rtmps://fa723fc1b171.global-contribute.live-video.net:443/app", true);
             AddPlatform("facebook", "Facebook Gaming", "FB", "#1877F2", "rtmps://live-api-s.facebook.com:443/rtmp/", false);
-            AddPlatform("tiktok", "TikTok", "TT", "#FE2C55", string.Empty, false);
-            AddPlatform("plura", "Plura", "P", "#E60023", string.Empty, true);
         }
 
         private void AddPlatform(
@@ -114,16 +130,19 @@ namespace Plura
             var saved = _store.LoadPlatform(id);
             platform.Enabled = saved.Enabled;
             platform.StreamKey = saved.StreamKey;
-            if (!string.IsNullOrWhiteSpace(saved.ServerUrl)) { platform.ServerUrl = saved.ServerUrl; }
+
+            // El servidor de ingesta es fijo para cada plataforma. Se ignora
+            // cualquier URL antigua guardada para no romper el relay con un
+            // valor obsoleto de versiones anteriores.
+            platform.ServerUrl = defaultServer;
+
             if (!string.IsNullOrWhiteSpace(saved.TargetName)) { platform.TargetName = saved.TargetName; }
 
-            platform.Mode = string.Equals(saved.Mode, "account", StringComparison.OrdinalIgnoreCase)
-                ? CredentialMode.Account
-                : CredentialMode.Manual;
-            platform.Linked = saved.Linked;
-            platform.AccountLabel = saved.AccountLabel;
-            platform.IsConfigOpen =
-                !platform.Linked && string.IsNullOrWhiteSpace(platform.StreamKey);
+            // Sin acceso con cuenta: todas las plataformas usan Stream Key manual.
+            platform.Mode = CredentialMode.Manual;
+            platform.Linked = false;
+            platform.AccountLabel = string.Empty;
+            platform.IsConfigOpen = false;
 
             Platforms.Add(platform);
         }
@@ -158,8 +177,16 @@ namespace Plura
             ObsPasswordBox.Password = obs.Password;
 
             var backendUrl = _store.LoadBackendUrl();
+            if (!string.IsNullOrWhiteSpace(backendUrl) &&
+                backendUrl.IndexOf("192.168.1.57", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Migración del backend antiguo (Wi-Fi) al equipo actual.
+                backendUrl = backendUrl.Replace("192.168.1.57", "192.168.1.98");
+                _store.SaveBackendUrl(backendUrl);
+            }
             BackendUrlBox.Text = backendUrl;
             _backend.BaseUrl = backendUrl;
+            App.Log("Backend URL: " + backendUrl);
 
             TwitchChannelBox.Text = _store.LoadTwitchChannel();
             _consoleMode = true;
@@ -526,7 +553,7 @@ namespace Plura
 
             if (ready.Count == 0)
             {
-                ShowMessage("Configura las plataformas activas en modo Manual (URL + clave) o vincula su cuenta.");
+                ShowMessage("Configura la Stream Key de las plataformas activas.");
                 return;
             }
 
@@ -694,7 +721,7 @@ namespace Plura
             if (!IsPlatformReady(platform))
             {
                 platform.IsConfigOpen = true;
-                ShowMessage(platform.Name + ": configura el modo Manual o vincula tu cuenta.");
+                ShowMessage(platform.Name + ": pega la Stream Key de la plataforma.");
                 return;
             }
 
@@ -868,7 +895,7 @@ namespace Plura
             var channel = NormalizeTwitchLogin(TwitchChannelBox.Text);
             if (channel.Length == 0)
             {
-                ShowMessage("Escribe tu canal de Twitch o pulsa Usar mi cuenta.");
+                ShowMessage("Escribe el canal de Twitch que emite desde la Xbox.");
                 return;
             }
 
@@ -930,7 +957,7 @@ namespace Plura
 
                 if (targets.Count == 0)
                 {
-                    ShowMessage("No hay destinos listos. Configura URL + clave o vincula cada cuenta.");
+                    ShowMessage("No hay destinos listos. Pega la Stream Key de al menos una plataforma.");
                     return;
                 }
 
@@ -993,6 +1020,13 @@ namespace Plura
                 var status = await _relay.GetStatusAsync(_pageCts.Token);
                 ApplyRelayStatus(status);
 
+                if (string.Equals(BackendStatusText.Text, "Sin conexión", StringComparison.Ordinal) ||
+                    string.Equals(BackendStatusText.Text, "Sin probar", StringComparison.Ordinal))
+                {
+                    BackendStatusText.Text = "Conectado";
+                    BackendStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 126, 232, 160));
+                }
+
                 if (notify)
                 {
                     ShowMessage(status.Running
@@ -1006,6 +1040,12 @@ namespace Plura
                 RelayStatusText.Text = "SIN BACKEND";
                 RelayStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 107, 122));
                 RelayStatusPill.Background = new SolidColorBrush(Color.FromArgb(255, 42, 12, 17));
+                RelayDetailText.Text =
+                    "Sin conexión con " + (_backend.BaseUrl ?? string.Empty).TrimEnd('/') +
+                    ". Enciende el backend en el PC (server\\start-backend.ps1) " +
+                    "y pulsa «Probar backend».";
+                BackendStatusText.Text = "Sin conexión";
+                BackendStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 107, 122));
                 if (notify) { ShowMessage("Relay: " + ex.Message); }
             }
         }
@@ -1111,7 +1151,9 @@ namespace Plura
             if (login.Length == 0)
             {
                 _channelInfo = null;
-                ChannelStatusText.Text = "Escribe tu canal o vincula tu cuenta de Twitch.";
+                ClearChannelAvatar();
+                ChannelAvatarFallback.Text = "T";
+                ChannelStatusText.Text = "Escribe el canal de Twitch que emite desde la Xbox.";
                 ChannelStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 155, 155, 164));
                 return;
             }
@@ -1119,7 +1161,17 @@ namespace Plura
             try
             {
                 var info = await _relay.CheckChannelAsync(login, _pageCts.Token);
+
+                // Si el usuario cambió de canal mientras se consultaba, se
+                // descarta la respuesta anterior.
+                if (!string.Equals(login, NormalizeTwitchLogin(TwitchChannelBox.Text),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
                 _channelInfo = info;
+                await ApplyChannelAvatarAsync(info);
 
                 if (info.Live)
                 {
@@ -1150,6 +1202,7 @@ namespace Plura
             catch (Exception ex)
             {
                 _channelInfo = null;
+                ClearChannelAvatar();
                 ChannelStatusText.Text = "No se pudo comprobar el canal.";
                 ChannelStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 107, 122));
                 if (notify) { ShowMessage("Twitch: " + ex.Message); }
@@ -1160,45 +1213,156 @@ namespace Plura
             }
         }
 
-        private async void UseTwitchAccount_Click(object sender, RoutedEventArgs e)
+        private async Task ApplyChannelAvatarAsync(RelayChannelInfo info)
         {
-            var twitch = Platforms.FirstOrDefault(
-                p => string.Equals(p.Id, "twitch", StringComparison.OrdinalIgnoreCase));
-            if (twitch == null) { return; }
+            var fallback = string.IsNullOrWhiteSpace(info.DisplayName)
+                ? info.Login
+                : info.DisplayName;
+            var initial = string.IsNullOrWhiteSpace(fallback)
+                ? "T"
+                : fallback.Substring(0, 1).ToUpperInvariant();
+            ChannelAvatarFallback.Text = initial;
 
-            if (!ApplyBackendUrl()) { return; }
-
-            UseTwitchAccountButton.IsEnabled = false;
-            try
+            var url = (info.AvatarUrl ?? string.Empty).Trim();
+            var identity = url.Length > 0 ? url : "login:" + (info.Login ?? string.Empty);
+            if (string.Equals(identity, _channelAvatarUrl, StringComparison.Ordinal))
             {
-                if (!twitch.Linked)
-                {
-                    await LinkAccountAsync(twitch);
-                }
+                // Ya hay una foto cargada para este canal: no se toca la vista
+                // para no taparla con la inicial en cada sondeo.
+                return;
+            }
 
-                if (!twitch.Linked) { return; }
+            // Va a cambiar la foto: se deja la inicial visible hasta que la
+            // imagen esté lista.
+            ChannelAvatarFallback.Visibility = Visibility.Visible;
+            ChannelAvatarImage.Background = new SolidColorBrush(Color.FromArgb(255, 0x1E, 0x1E, 0x22));
 
+            // 1) El backend ya descargó la foto y la manda en base64. Así la
+            //    consola no depende de poder llegar a la CDN de Twitch.
+            var base64 = (info.AvatarBase64 ?? string.Empty).Trim();
+            if (base64.Length > 0)
+            {
                 try
                 {
-                    var info = await _relay.GetLinkedChannelAsync(_pageCts.Token);
-                    if (!string.IsNullOrWhiteSpace(info.Login))
+                    var bytes = Convert.FromBase64String(base64);
+                    using (var stream = new InMemoryRandomAccessStream())
                     {
-                        TwitchChannelBox.Text = info.Login;
-                        _store.SaveTwitchChannel(info.Login);
-                        ShowMessage("Canal detectado: " + info.Login);
-                        await CheckChannelAsync(true);
+                        var writer = new DataWriter(stream.GetOutputStreamAt(0));
+                        writer.WriteBytes(bytes);
+                        await writer.StoreAsync();
+                        await writer.FlushAsync();
+                        writer.DetachStream();
+                        writer.Dispose();
+
+                        stream.Seek(0);
+                        var bitmap = new BitmapImage();
+                        await bitmap.SetSourceAsync(stream);
+
+                        _channelAvatarUrl = identity;
+                        ShowChannelAvatar(bitmap);
+                        App.Log("Avatar base64 ok: " + identity + " (" + bytes.Length + " bytes)");
+                        return;
                     }
                 }
                 catch (Exception ex)
                 {
-                    ShowMessage("No se pudo detectar el canal: " + ex.Message +
-                                " Escríbelo manualmente.");
+                    App.Log("Avatar base64 failed: " + ex.Message);
                 }
             }
-            finally
+
+            // 2) Respaldo: pedir la foto al backend por LAN (HTTP) y, si no,
+            //    usar la URL pública de Twitch. Se prueban en orden.
+            _avatarFallbacks.Clear();
+
+            var root = (_backend.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
+            if (root.Length > 0 && !string.IsNullOrEmpty(info.Login))
             {
-                UseTwitchAccountButton.IsEnabled = true;
+                var proxy = root + "/v1/twitch/avatar?login=" +
+                            Uri.EscapeDataString(info.Login);
+                if (Uri.TryCreate(proxy, UriKind.Absolute, out var proxyUri))
+                {
+                    _avatarFallbacks.Add(proxyUri);
+                }
             }
+
+            if (url.Length > 0 &&
+                Uri.TryCreate(url, UriKind.Absolute, out var directUri) &&
+                (string.Equals(directUri.Scheme, "https", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(directUri.Scheme, "http", StringComparison.OrdinalIgnoreCase)))
+            {
+                _avatarFallbacks.Add(directUri);
+            }
+
+            if (_avatarFallbacks.Count == 0)
+            {
+                ClearChannelAvatar();
+                ChannelAvatarFallback.Text = initial;
+                return;
+            }
+
+            _channelAvatarUrl = identity;
+            TryLoadNextAvatar();
+        }
+
+        private void ShowChannelAvatar(ImageSource source)
+        {
+            ChannelAvatarImage.Background = new ImageBrush
+            {
+                ImageSource = source,
+                Stretch = Stretch.UniformToFill
+            };
+            ChannelAvatarFallback.Visibility = Visibility.Collapsed;
+        }
+
+        private bool TryLoadNextAvatar()
+        {
+            if (_avatarFallbacks.Count == 0)
+            {
+                return false;
+            }
+
+            var uri = _avatarFallbacks[0];
+            _avatarFallbacks.RemoveAt(0);
+
+            var remote = new BitmapImage
+            {
+                DecodePixelWidth = 112,
+                CreateOptions = BitmapCreateOptions.None
+            };
+            remote.ImageFailed += ChannelAvatarImage_ImageFailed;
+            remote.ImageOpened += ChannelAvatarRemote_ImageOpened;
+            remote.UriSource = uri;
+            ChannelAvatarImage.Background = new ImageBrush
+            {
+                ImageSource = remote,
+                Stretch = Stretch.UniformToFill
+            };
+            App.Log("Avatar remote: " + uri);
+            return true;
+        }
+
+        private void ClearChannelAvatar()
+        {
+            _channelAvatarUrl = string.Empty;
+            _avatarFallbacks.Clear();
+            ChannelAvatarImage.Background = new SolidColorBrush(Color.FromArgb(255, 0x1E, 0x1E, 0x22));
+            ChannelAvatarFallback.Visibility = Visibility.Visible;
+        }
+
+        private void ChannelAvatarRemote_ImageOpened(object sender, RoutedEventArgs e)
+        {
+            ChannelAvatarFallback.Visibility = Visibility.Collapsed;
+        }
+
+        private void ChannelAvatarImage_ImageFailed(object sender, ExceptionRoutedEventArgs e)
+        {
+            // Si la foto no carga (sin red, URL caída) se prueba el siguiente
+            // respaldo y, si no queda ninguno, se deja la inicial del canal.
+            App.Log("Avatar image failed: " + (e != null ? e.ErrorMessage : string.Empty));
+            ChannelAvatarImage.Background = new SolidColorBrush(Color.FromArgb(255, 0x1E, 0x1E, 0x22));
+            ChannelAvatarFallback.Visibility = Visibility.Visible;
+            if (TryLoadNextAvatar()) { return; }
+            ClearChannelAvatar();
         }
 
         private async void CheckChannel_Click(object sender, RoutedEventArgs e)
@@ -1207,10 +1371,78 @@ namespace Plura
             await CheckChannelAsync(true);
         }
 
+        /// <summary>
+        /// Pega el nombre o el enlace del canal desde el portapapeles, lo
+        /// normaliza y comprueba el canal (incluida su foto) al instante.
+        /// </summary>
+        private async void PasteTwitchChannel_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var content = Clipboard.GetContent();
+                if (!content.Contains(StandardDataFormats.Text))
+                {
+                    ShowMessage("El portapapeles no tiene texto. Copia el nombre o el enlace del canal de Twitch.");
+                    return;
+                }
+
+                var text = (await content.GetTextAsync()).Trim();
+                var login = NormalizeTwitchLogin(text);
+                if (!IsValidTwitchLogin(login))
+                {
+                    ShowMessage("El portapapeles no contiene un canal de Twitch válido. Copia algo como twitch.tv/tu_canal.");
+                    return;
+                }
+
+                TwitchChannelBox.Text = login;
+                _store.SaveTwitchChannel(login);
+                ShowMessage("Canal pegado: " + login + ".");
+
+                if (ApplyBackendUrl())
+                {
+                    await CheckChannelAsync(true);
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log("Paste Twitch channel failed: " + ex.Message);
+                ShowMessage("No se pudo leer el portapapeles: " + ex.Message);
+            }
+        }
+
+        private static bool IsValidTwitchLogin(string login)
+        {
+            if (string.IsNullOrEmpty(login) || login.Length < 3 || login.Length > 25)
+            {
+                return false;
+            }
+
+            foreach (var c in login)
+            {
+                var valid = (c >= 'a' && c <= 'z') ||
+                            (c >= '0' && c <= '9') ||
+                            c == '_';
+                if (!valid) { return false; }
+            }
+
+            return true;
+        }
+
         private void TwitchChannelBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (!_loaded) { return; }
-            _store.SaveTwitchChannel(NormalizeTwitchLogin(TwitchChannelBox.Text));
+
+            var login = NormalizeTwitchLogin(TwitchChannelBox.Text);
+            _store.SaveTwitchChannel(login);
+
+            // Si el canal escrito ya no coincide con el que muestra la foto,
+            // se oculta la imagen anterior hasta comprobar el nuevo.
+            if (_channelInfo != null &&
+                !string.Equals(login, _channelInfo.Login, StringComparison.OrdinalIgnoreCase))
+            {
+                _channelInfo = null;
+                ClearChannelAvatar();
+            }
         }
 
         private static string NormalizeTwitchLogin(string value)
@@ -1218,10 +1450,11 @@ namespace Plura
             var text = (value ?? string.Empty).Trim();
             if (text.Length == 0) { return string.Empty; }
 
-            var marker = text.IndexOf("twitch.tv/", StringComparison.OrdinalIgnoreCase);
+            var marker = text.IndexOf("twitch.tv", StringComparison.OrdinalIgnoreCase);
             if (marker >= 0)
             {
-                text = text.Substring(marker + "twitch.tv/".Length);
+                // Acepta enlaces como https://www.twitch.tv/canal o m.twitch.tv/canal.
+                text = text.Substring(marker + "twitch.tv".Length).TrimStart('/');
                 var slash = text.IndexOfAny(new[] { '/', '?', '#' });
                 if (slash >= 0) { text = text.Substring(0, slash); }
             }
@@ -1272,166 +1505,14 @@ namespace Plura
             UpdateUI();
         }
 
-        private void ToggleConfig_Click(object sender, RoutedEventArgs e)
-        {
-            var platform = (sender as FrameworkElement)?.DataContext as PlatformViewModel;
-            if (platform == null) { return; }
-            platform.IsConfigOpen = !platform.IsConfigOpen;
-        }
-
-        // ------------------------------------------------- Credenciales / cuentas
-
-        private void ModeAccount_Click(object sender, RoutedEventArgs e)
-        {
-            var platform = (sender as FrameworkElement)?.DataContext as PlatformViewModel;
-            if (platform == null) { return; }
-
-            platform.Mode = CredentialMode.Account;
-            SavePlatform(platform);
-            UpdateUI();
-
-            if (!platform.Linked)
-            {
-                ShowMessage(platform.Name + ": pulsa Conectar cuenta para vincularla.");
-            }
-        }
-
-        private void ModeManual_Click(object sender, RoutedEventArgs e)
-        {
-            var platform = (sender as FrameworkElement)?.DataContext as PlatformViewModel;
-            if (platform == null) { return; }
-
-            platform.Mode = CredentialMode.Manual;
-            SavePlatform(platform);
-            UpdateUI();
-        }
-
-        private async void AccountLink_Click(object sender, RoutedEventArgs e)
-        {
-            var platform = (sender as FrameworkElement)?.DataContext as PlatformViewModel;
-            if (platform == null || platform.IsLinking) { return; }
-
-            if (platform.Linked)
-            {
-                await UnlinkAccountAsync(platform);
-                return;
-            }
-
-            await LinkAccountAsync(platform);
-        }
-
-        private async Task LinkAccountAsync(PlatformViewModel platform)
-        {
-            if (!ApplyBackendUrl()) { return; }
-
-            platform.IsLinking = true;
-            platform.ResetLink();
-            platform.LinkStatus = "Iniciando vinculación…";
-            UpdateUI();
-
-            try
-            {
-                var challenge = await _auth.StartLinkAsync(
-                    platform.Id, platform.Name, _pageCts.Token);
-
-                platform.LinkCode = challenge.Code;
-                platform.LinkUrl = challenge.VerificationUrl;
-                platform.LinkStatus = "Esperando confirmación…";
-
-                ShowMessage(platform.Name + ": abre " + challenge.VerificationUrl +
-                            " y escribe el código " + challenge.Code);
-
-                while (!_pageCts.IsCancellationRequested)
-                {
-                    if (DateTimeOffset.UtcNow > challenge.ExpiresAt)
-                    {
-                        platform.LinkStatus = "El código caducó.";
-                        ShowMessage(platform.Name + ": el código caducó. Vuelve a intentarlo.");
-                        return;
-                    }
-
-                    await Task.Delay(
-                        TimeSpan.FromSeconds(challenge.IntervalSeconds), _pageCts.Token);
-
-                    var poll = await _auth.PollLinkAsync(challenge, _pageCts.Token);
-
-                    if (poll.State == LinkPollState.Linked)
-                    {
-                        platform.Linked = true;
-                        platform.AccountLabel = poll.AccountLabel ?? string.Empty;
-                        platform.ResetLink();
-                        platform.LinkStatus = "Cuenta vinculada.";
-                        SavePlatform(platform);
-                        UpdateUI();
-
-                        ShowMessage(platform.Name + ": cuenta vinculada" +
-                            (string.IsNullOrWhiteSpace(platform.AccountLabel)
-                                ? "."
-                                : " · " + platform.AccountLabel));
-                        return;
-                    }
-
-                    if (poll.State == LinkPollState.Expired || poll.State == LinkPollState.Error)
-                    {
-                        platform.LinkStatus = poll.Error;
-                        ShowMessage(platform.Name + ": " + poll.Error);
-                        return;
-                    }
-                }
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                platform.LinkStatus = ex.Message;
-                ShowMessage(platform.Name + ": " + ex.Message);
-            }
-            finally
-            {
-                platform.IsLinking = false;
-                UpdateUI();
-            }
-        }
-
-        private async Task UnlinkAccountAsync(PlatformViewModel platform)
-        {
-            if (!ApplyBackendUrl()) { return; }
-
-            platform.IsLinking = true;
-            UpdateUI();
-
-            try
-            {
-                await _auth.UnlinkAsync(platform.Id, _pageCts.Token);
-                platform.Linked = false;
-                platform.AccountLabel = string.Empty;
-                platform.ResetLink();
-                platform.LinkStatus = "Cuenta desvinculada.";
-                SavePlatform(platform);
-                ShowMessage(platform.Name + ": cuenta desvinculada.");
-            }
-            catch (Exception ex)
-            {
-                // Aunque el backend no responda, la app deja de usar la cuenta.
-                platform.Linked = false;
-                platform.AccountLabel = string.Empty;
-                platform.ResetLink();
-                platform.LinkStatus = "Desvinculada en esta consola.";
-                SavePlatform(platform);
-                ShowMessage(platform.Name + ": desvinculada en esta consola. " + ex.Message);
-            }
-            finally
-            {
-                platform.IsLinking = false;
-                UpdateUI();
-            }
-        }
+        // ------------------------------------------------------------- Backend
 
         private bool ApplyBackendUrl()
         {
             var url = (BackendUrlBox.Text ?? string.Empty).Trim();
             if (url.Length == 0)
             {
-                ShowMessage("Escribe la URL del backend de Plura, por ejemplo http://192.168.1.57:8787.");
+                ShowMessage("Escribe la URL del backend de Plura, por ejemplo http://192.168.1.98:8787.");
                 return false;
             }
 
@@ -1477,26 +1558,6 @@ namespace Plura
             }
         }
 
-        private void PlatformServerBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            var box = sender as TextBox;
-            var platform = box?.DataContext as PlatformViewModel;
-            if (platform == null) { return; }
-
-            platform.ServerUrl = box.Text;
-            SavePlatform(platform);
-        }
-
-        private void PlatformTargetBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            var box = sender as TextBox;
-            var platform = box?.DataContext as PlatformViewModel;
-            if (platform == null) { return; }
-
-            platform.TargetName = box.Text;
-            SavePlatform(platform);
-        }
-
         private void StreamKeyBox_Loaded(object sender, RoutedEventArgs e)
         {
             var box = sender as PasswordBox;
@@ -1519,6 +1580,63 @@ namespace Plura
                 SavePlatform(platform);
                 UpdateUI();
             }
+        }
+
+        /// <summary>Pega la Stream Key del portapapeles en el campo de esa plataforma.</summary>
+        private async void PasteStreamKey_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as FrameworkElement;
+            if (button == null) { return; }
+
+            try
+            {
+                var content = Clipboard.GetContent();
+                if (!content.Contains(StandardDataFormats.Text))
+                {
+                    ShowMessage("El portapapeles no tiene texto. Copia la Stream Key primero.");
+                    return;
+                }
+
+                var text = (await content.GetTextAsync()).Trim();
+                if (text.Length == 0)
+                {
+                    ShowMessage("La Stream Key del portapapeles está vacía.");
+                    return;
+                }
+
+                var box = FindDescendant<PasswordBox>(button.Parent as DependencyObject);
+                if (box == null)
+                {
+                    ShowMessage("No se encontró el campo de Stream Key.");
+                    return;
+                }
+
+                box.Password = text;
+                ShowMessage("Stream Key pegada.");
+            }
+            catch (Exception ex)
+            {
+                App.Log("Paste stream key failed: " + ex.Message);
+                ShowMessage("No se pudo leer el portapapeles: " + ex.Message);
+            }
+        }
+
+        private static T FindDescendant<T>(DependencyObject root) where T : DependencyObject
+        {
+            if (root == null) { return null; }
+
+            var count = VisualTreeHelper.GetChildrenCount(root);
+            for (var i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                var match = child as T;
+                if (match != null) { return match; }
+
+                var nested = FindDescendant<T>(child);
+                if (nested != null) { return nested; }
+            }
+
+            return null;
         }
 
         private void ObsHostBox_TextChanged(object sender, TextChangedEventArgs e)

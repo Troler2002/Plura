@@ -17,7 +17,7 @@ const {
   redirect
 } = require("./util");
 const { registry, providerForPlatform, providerById } = require("./providers");
-const { relay, RelayError, resolveChannel, normalizeLogin } = require("./relay");
+const { relay, RelayError, resolveChannel, resolveAvatar, normalizeLogin } = require("./relay");
 
 const store = new Store(config.dataFile);
 
@@ -448,6 +448,46 @@ async function handleSession(req, res) {
   json(res, 200, { sessionToken: token });
 }
 
+/**
+ * Ajustes que la app de la consola conserva aunque se reinstale: canal de
+ * Twitch y Stream Keys. Viven en el backend (en la red local del usuario) para
+ * no perderse al actualizar o reinstalar la app.
+ */
+function handleGetSettings(req, res) {
+  if (!requireUser(req, res)) { return; }
+  const saved = store.data.settings || {};
+  json(res, 200, {
+    twitchChannel: saved.twitchChannel || "",
+    platforms: saved.platforms || {}
+  });
+}
+
+async function handleSaveSettings(req, res) {
+  if (!requireUser(req, res)) { return; }
+  const body = await jsonBody(req, res);
+  if (body === null) { return; }
+
+  const channel = typeof body.twitchChannel === "string"
+    ? body.twitchChannel.trim().toLowerCase()
+    : "";
+
+  const platforms = {};
+  if (body.platforms && typeof body.platforms === "object") {
+    for (const [id, value] of Object.entries(body.platforms)) {
+      if (!/^[a-z0-9_-]+$/i.test(id)) { continue; }
+      if (!value || typeof value !== "object") { continue; }
+      platforms[id] = {
+        streamKey: typeof value.streamKey === "string" ? value.streamKey : "",
+        enabled: Boolean(value.enabled)
+      };
+    }
+  }
+
+  store.data.settings = { twitchChannel: channel, platforms };
+  store.save();
+  json(res, 200, { ok: true });
+}
+
 async function handleRelayStatus(req, res) {
   if (!requireUser(req, res)) { return; }
   json(res, 200, relay.snapshot());
@@ -464,14 +504,21 @@ async function handleRelayStart(req, res) {
       channel: body.channel,
       outputs: body.outputs
     });
+    console.log(
+      "[relay] iniciado canal=" + status.channel +
+      " destinos=" + status.outputs.map((o) => o.platform).join(",")
+    );
     json(res, 200, status);
   } catch (err) {
-    json(res, err instanceof RelayError ? err.status : 502, { error: err.message });
+    const code = err instanceof RelayError ? err.status : 502;
+    console.error("[relay] no se pudo iniciar (" + code + "): " + err.message);
+    json(res, code, { error: err.message });
   }
 }
 
 async function handleRelayStop(req, res) {
   if (!requireUser(req, res)) { return; }
+  console.log("[relay] detenido por la app");
   json(res, 200, relay.stop());
 }
 
@@ -487,6 +534,29 @@ async function handleRelayChannel(req, res, url) {
     json(res, 200, info);
   } catch (err) {
     json(res, err instanceof RelayError ? err.status : 502, { error: err.message });
+  }
+}
+
+/** Foto del canal servida por el backend, sin depender de la CDN en la consola. */
+async function handleTwitchAvatar(req, res, url) {
+  try {
+    const avatar = await resolveAvatar(normalizeLogin(url.searchParams.get("login")));
+    if (!avatar) {
+      res.writeHead(404, { "Cache-Control": "no-store" });
+      res.end();
+      return;
+    }
+
+    const bytes = Buffer.from(avatar.base64, "base64");
+    res.writeHead(200, {
+      "Content-Type": avatar.contentType || "image/png",
+      "Content-Length": bytes.length,
+      "Cache-Control": "public, max-age=600"
+    });
+    res.end(bytes);
+  } catch (err) {
+    res.writeHead(err instanceof RelayError ? err.status : 502);
+    res.end();
   }
 }
 
@@ -704,6 +774,16 @@ async function handle(req, res) {
     return;
   }
 
+  if (req.method === "GET" && path === "/v1/settings") {
+    handleGetSettings(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && path === "/v1/settings") {
+    await handleSaveSettings(req, res);
+    return;
+  }
+
   if (req.method === "GET" && path === "/v1/relay/status") {
     await handleRelayStatus(req, res);
     return;
@@ -721,6 +801,11 @@ async function handle(req, res) {
 
   if (req.method === "GET" && path === "/v1/relay/channel") {
     await handleRelayChannel(req, res, url);
+    return;
+  }
+
+  if (req.method === "GET" && path === "/v1/twitch/avatar") {
+    await handleTwitchAvatar(req, res, url);
     return;
   }
 
@@ -778,14 +863,40 @@ async function handle(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  const startedAt = Date.now();
+  const label = req.method + " " + (req.url || "/");
+
+  // Registro de peticiones: ayuda a ver si la consola llega al backend.
+  // El sondeo de salud (/v1/health) solo se registra si falla.
+  res.on("finish", () => {
+    const isHealth = (req.url || "").split("?")[0] === "/v1/health";
+    if (isHealth && res.statusCode < 400) { return; }
+    console.log(
+      "[http] " + label + " -> " + res.statusCode +
+      " (" + (Date.now() - startedAt) + " ms)"
+    );
+  });
+
   handle(req, res).catch((err) => {
-    console.error("[http] " + (err && err.stack ? err.stack : err));
+    console.error("[http] " + label + " falló: " + (err && err.stack ? err.stack : err));
     if (!res.headersSent) {
       json(res, 500, { error: "Error interno del backend." });
     } else {
       res.end();
     }
   });
+});
+
+// El backend no debe caerse por un error aislado (Twitch, ffmpeg o red).
+// Registramos el fallo y seguimos sirviendo al resto de destinos.
+process.on("unhandledRejection", (reason) => {
+  console.error(
+    "[unhandledRejection] " + (reason && reason.stack ? reason.stack : reason)
+  );
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException] " + (err && err.stack ? err.stack : err));
 });
 
 server.listen(config.port, config.host, () => {

@@ -89,6 +89,9 @@ namespace Plura.Services.Streaming
     {
         public string Login { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
+        public string AvatarUrl { get; set; } = string.Empty;
+        public string AvatarBase64 { get; set; } = string.Empty;
+        public string AvatarContentType { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
         public bool Live { get; set; }
         public int Viewers { get; set; }
@@ -100,6 +103,9 @@ namespace Plura.Services.Streaming
 
             info.Login = PluraBackendClient.GetString(json, "login", string.Empty);
             info.DisplayName = PluraBackendClient.GetString(json, "displayName", string.Empty);
+            info.AvatarUrl = PluraBackendClient.GetString(json, "avatarUrl", string.Empty);
+            info.AvatarBase64 = PluraBackendClient.GetString(json, "avatarBase64", string.Empty);
+            info.AvatarContentType = PluraBackendClient.GetString(json, "avatarContentType", string.Empty);
             info.Title = PluraBackendClient.GetString(json, "title", string.Empty);
             info.Live = PluraBackendClient.GetString(json, "live", "false") == "true";
             info.Viewers = (int)PluraBackendClient.GetNumber(json, "viewers", 0);

@@ -7,30 +7,41 @@ de red es C#.
 ## Qué hace
 
 - Interfaz de TV con navegación por **mando** (foco, `XYFocusKeyboardNavigation`, TV-safe).
+- **Guía rápida** integrada en la pantalla principal.
 - **Switches** por plataforma + switch maestro **Transmitir en todas**.
-- Resumen **“Vas a transmitir a”** con chips de las plataformas activas.
+- Resumen **“Vas a transmitir a”** con chips de los destinos y Twitch como **origen**.
 - Estado por plataforma: **LISTA / CONECTANDO / EN VIVO / ERROR**.
 - Estadísticas en vivo por destino: **bitrate, FPS, duración**.
-- Inicio y parada **global** o **por plataforma**.
-- Conexión a OBS por **WebSocket v5** con contraseña, reconexión automática y detección
-  del plugin **Multiple RTMP Output**.
-- **Dos modos de credenciales**: manual (URL + clave) o **Conectar cuenta**
-  (OAuth/backend), unificados en una sola URL de servidor + Stream Key.
-- Vinculación por **código de dispositivo** (sin WebView) con el backend de referencia
-  incluido en `server/`.
+- Inicio y parada **global** del relay.
+- **Stream Key manual**: una sola clave por plataforma, con botón **Pegar** desde el
+  portapapeles y servidor de ingesta rellenado automáticamente.
+- **Sin acceso con cuenta**: Plura no pide usuario, contraseña ni OAuth.
 - Ajustes persistentes en `ApplicationData.Current.LocalSettings`.
 
-Plataformas: **Twitch, YouTube, Kick, Facebook Gaming, TikTok y Plura**.
+Plataformas: **Twitch (origen), YouTube, Kick y Facebook Gaming**. Solo se incluyen
+redes que emiten con una **Stream Key** sobre un servidor de ingesta fijo.
+
+## Cómo funciona
+
+La app funciona **solo con la consola**:
+
+1. La Xbox emite a Twitch con **Guía → Capturar y compartir → Emisión en directo**.
+2. Plura pide al backend que reciba ese HLS y lo reparta a los destinos activos.
+3. El backend usa **ffmpeg** (`-c copy`) y un proceso por destino.
+
+No se necesita PC junto a la consola, capturadora ni OBS.
+
+> La sección **Capturar y compartir** de la Guía de Xbox es del sistema y **no admite
+> apps de terceros**. No es posible añadir Plura allí; por eso la app incluye su propia
+> **Guía rápida** y automatiza el resto.
 
 ## Requisitos previos
 
 - **Visual Studio 2022** con la carga de trabajo
   **Desarrollo para la Plataforma Universal de Windows** y el SDK de Windows 10 (10.0.19041).
 - **Xbox Series X|S o Xbox One** con **Modo Desarrollador** activo.
-- PC con **OBS Studio 28+** y el plugin
-  **[Multiple RTMP Output (fork WebSocket)](https://github.com/romestylez/obs-multi-rtmp-websocket)**.
-- (Opcional, para **Conectar cuenta**) Node.js 18+ para ejecutar `server/`.
-- PC y consola en la **misma red local**.
+- **Backend** con Node.js 18+ y **ffmpeg** (en tu red o un VPS).
+- Consola y backend accesibles entre sí.
 
 > Compilar una app UWP requiere Visual Studio con la carga de trabajo UWP. El SDK de .NET
 > por sí solo (por ejemplo `dotnet build`) **no** puede compilar este proyecto.
@@ -61,14 +72,14 @@ en `Package.appxmanifest`.
 
 1. Activa el **Modo Desarrollador** en la Xbox.
 2. Instala `Plura_Dev.cer` en la consola si el despliegue lo pide.
-3. En el PC, activa el **WebSocket de OBS** (puerto `4455`, con contraseña) e instala el
-   plugin Multiple RTMP Output.
-4. Permite el puerto `4455` en el Firewall de Windows (red privada).
-5. Dentro de Plura escribe el **host** con la **IP LAN del PC** (ej. `192.168.1.20`).
-   `localhost` no funciona desde la consola.
-6. Configura cada plataforma en modo **Manual** (URL + clave) o **Conectar cuenta**
-   (backend + código de vinculación).
-7. Activa los switches y pulsa **▶ Iniciar stream**.
+3. Arranca el backend con `FFMPEG_PATH` y anota su IP LAN.
+4. Dentro de Plura escribe la **URL del backend** en **Backend de Plura** y pulsa
+   **Probar backend**.
+5. Pega el **canal de Twitch** (nombre o enlace) con **Pegar** y pulsa
+   **Comprobar canal**. La tarjeta muestra la foto del canal y si está en vivo.
+6. En cada plataforma destino, pega su **Stream Key** con el botón **Pegar**. El servidor
+   de ingesta ya viene configurado.
+7. Activa los switches y pulsa **▶ Iniciar relay** cuando el canal esté **EN VIVO**.
 
 ## Estructura del proyecto
 
@@ -80,45 +91,29 @@ XboxMultiStreamNative/
 ├── Plura_Dev.cer                 ← certificado público
 ├── App.xaml / App.xaml.cs        ← punto de entrada, Frame raíz
 ├── MainPage.xaml                 ← interfaz nativa completa
-├── MainPage.xaml.cs              ← lógica de UI, inicio/parada y polling
+├── MainPage.xaml.cs              ← lógica de UI y relay
 ├── Models/
 │   ├── PlatformViewModel.cs      ← estado de cada plataforma (INotifyPropertyChanged)
 │   └── SelectionChip.cs          ← chips del resumen de selección
 ├── Services/
-│   ├── ObsClient.cs              ← cliente WebSocket v5 + vendor romestylez.multi_rtmp
 │   ├── SettingsStore.cs          ← persistencia en LocalSettings
-│   └── Streaming/                ← proveedores manual/OAuth, coordinador y sink OBS
+│   └── Streaming/                ← credenciales, cliente del relay y coordinador
 ├── Properties/
 │   ├── AssemblyInfo.cs
 │   └── Default.rd.xml
 └── Assets/                       ← iconos y splash en rojo/negro
 ```
 
-## Cómo habla con OBS
+## Flujo del relay
 
-`Services/ObsClient.cs` implementa el protocolo **obs-websocket v5** directamente sobre
-`ClientWebSocket` (sin NuGet):
-
-- Handshake: `Hello` (op 0) → `Identify` (op 1, con autenticación SHA-256) → `Identified` (op 2).
-- Peticiones: `Request` (op 6) → `RequestResponse` (op 7), con timeout de 15 s.
-- Vendor: `CallVendorRequest` con `vendorName = "romestylez.multi_rtmp"` (API PascalCase).
-
-Flujo al iniciar una plataforma:
-
-1. La primera plataforma seleccionada se convierte en la **transmisión principal** de
-   OBS: `SetStreamServiceSettings` (`rtmp_custom`) + `StartStream`. Hay que esperar a que
-   `GetStreamStatus.outputActive` sea `true`.
-2. Para el resto, `EnsureTargetAsync`: `ListTargets` para buscar el destino por nombre,
-   `AddTarget` si no existe, `UpdateServiceParam` (`key = "server"`), `UpdateStreamKey`
-   y `StartTarget`.
-3. El estado se refresca cada 2 s con `GetStreamStatus` + `ListTargets`/`GetTargetStats`.
-
-El plugin reutiliza el **encoder principal** de OBS: sin la transmisión principal activa,
-`PrepareOutputEncoders` muestra un aviso modal y bloquea la UI. Por eso nunca se inicia
-un destino antes de que la principal esté activa. El fork no rellena `isRunning_`, así
-que el estado en vivo se deduce de las estadísticas (bitrate, FPS o duración > 0).
-
-Si la conexión se cae, Plura reintenta cada ~10 s.
+1. La app pide la sesión al backend (`POST /v1/session`).
+2. Resuelve la Stream Key manual de cada destino.
+3. Envía `POST /v1/relay/start` con el canal y los destinos.
+4. El backend comprueba que el canal esté en vivo, obtiene el HLS y lanza un ffmpeg por
+   destino con `-c copy`.
+5. La app consulta `GET /v1/relay/status` cada 2 s para mostrar bitrate, FPS, duración y
+   estado; el canal se comprueba cada 10 s.
+6. `POST /v1/relay/stop` termina los procesos ffmpeg de forma limpia.
 
 ## Capacidades del manifiesto
 
@@ -127,38 +122,36 @@ Si la conexión se cae, Plura reintenta cada ~10 s.
 <Capability Name="privateNetworkClientServer" />
 ```
 
-`privateNetworkClientServer` es imprescindible para llegar al OBS del PC por la LAN.
+`internetClient` es necesario para el backend y para comprobar el canal de Twitch;
+`privateNetworkClientServer` para llegar a un backend en la LAN.
 
 ## Problemas frecuentes
 
 | Síntoma | Causa / solución |
 |---|---|
-| “No se pudo conectar con OBS” | Host incorrecto: usa la IP LAN del PC, no `localhost`. Revisa puerto y contraseña. |
-| Conecta pero no hay destinos | Falta el plugin Multiple RTMP Output o no se reinició OBS. |
-| “OBS rechazó la conexión” | Contraseña del WebSocket incorrecta. |
-| El stream no arranca | Stream Key o URL RTMP incorrectas; revisa el destino en OBS. |
-| Aviso de encoder o el primer destino no arranca | OBS no está transmitiendo: Plura inicia la plataforma principal primero. Comprueba sus credenciales. |
-| TikTok no conecta | Su URL RTMP es por cuenta/región: cópiala de TikTok LIVE Center. |
-| El juego no aparece | La captura la hace OBS con la tarjeta HDMI; Plura solo controla OBS. |
+| “No se pudo conectar con el backend” | URL incorrecta o backend apagado. Usa la IP LAN, no `localhost`. |
+| “El canal no está en vivo” | Inicia primero la emisión nativa desde la Guía de Xbox. |
+| El relay no arranca | Falta `FFMPEG_PATH` o ffmpeg no está instalado en el servidor. |
+| Un destino falla y los demás siguen | Es el comportamiento esperado: cada destino tiene su propio ffmpeg. |
+| Una plataforma no arranca | Revisa que su Stream Key esté pegada y que la plataforma tenga la transmisión creada. |
 | La app no se despliega | Consola y PC en la misma red (mejor por cable), Modo Desarrollador activo y salida de la consola a **1080p**. También puedes subir el paquete desde **Device Portal**. |
 
 ## Limitaciones
 
-- Xbox **no permite** que apps de terceros capturen el juego: Plura controla OBS en un PC.
+- **La Guía de Xbox no se puede ampliar**: “Capturar y compartir” es del sistema y no
+  admite apps de terceros. Plura muestra su propia guía rápida.
+- Xbox **no permite** que apps de terceros capturen el juego; el modo consola usa la
+  emisión nativa a Twitch.
+- El relay depende del HLS no oficial de Twitch y de que el canal esté en vivo.
 - La app se instala en **Modo Desarrollador**; la Store requiere acuerdo de partner.
-- Resolución/FPS/bitrate de la app son de referencia: el encoder se configura en OBS.
-- **Plura** como destino requiere un servidor RTMP propio.
+- Solo se admiten redes con servidor de ingesta fijo y Stream Key. TikTok (URL por
+  cuenta/región) y Plura (servidor propio) quedaron fuera de esta versión.
 
 ## Estado de validación
 
 - Compilación nativa (csc + ilc) y despliegue **loose** en Xbox: **correctos**.
-- Conexión y autenticación contra OBS 33 + obs-websocket 5.7.6 desde la consola:
-  **verificada**.
-- Vendor `romestylez.multi_rtmp`: `ListTargets`, `AddTarget`, `StartTarget`,
-  `StopTarget` y `GetTargetStats`: **verificados**.
-- Transmisión principal + destino simultáneos contra dos receptores RTMP locales:
-  **~6 Mbps / 30 fps en ambos**, con parada limpia.
-- Modo **Conectar cuenta** con el backend de referencia: código → vinculación →
-  `/v1/ingest/twitch` → `source=Account` → stream principal activo: **verificado**.
+- Relay verificado de extremo a extremo con dos receptores RTMP locales: ~7 Mbps por
+  destino, estado `running`, parada limpia sin procesos ffmpeg residuales.
+- Flujo de **Stream Key manual** con botón **Pegar**: implementado en la app.
 - La captura y la inyección de entrada no están disponibles desde Device Portal; la
   verificación de la interfaz se hace por logs (`LocalState/plura.log`).

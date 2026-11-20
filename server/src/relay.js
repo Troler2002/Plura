@@ -11,6 +11,7 @@ const USER_QUERY = `query PluraChannel($login: String!) {
   user(login: $login) {
     login
     displayName
+    profileImageURL(width: 300)
     stream {
       id
       title
@@ -43,14 +44,23 @@ function validLogin(login) {
 }
 
 async function gql(query, variables) {
-  const res = await fetch(GQL_URL, {
-    method: "POST",
-    headers: {
-      "client-id": config.relay.twitchClientId,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({ query, variables })
-  });
+  let res;
+  try {
+    res = await fetch(GQL_URL, {
+      method: "POST",
+      headers: {
+        "client-id": config.relay.twitchClientId,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(10000)
+    });
+  } catch (err) {
+    throw new RelayError(
+      504,
+      "Twitch no respondió a tiempo. Comprueba la conexión del backend a Internet."
+    );
+  }
 
   const text = await res.text();
   let data;
@@ -72,6 +82,49 @@ async function gql(query, variables) {
 }
 
 /**
+ * La consola a veces no puede descargar la foto desde la CDN de Twitch, así
+ * que el backend la descarga una vez y la entrega en base64 dentro de la
+ * misma respuesta del canal. Se cachea por URL para no repetir la descarga.
+ */
+const AVATAR_TTL_MS = 10 * 60 * 1000;
+const avatarCache = new Map();
+
+async function avatarPayload(url) {
+  if (!url) { return null; }
+
+  const now = Date.now();
+  const cached = avatarCache.get(url);
+  if (cached && now - cached.at < AVATAR_TTL_MS) {
+    return cached;
+  }
+
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+
+    const contentType = response.headers.get("content-type") || "image/png";
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const entry = {
+      base64: bytes.toString("base64"),
+      contentType,
+      at: now
+    };
+
+    if (avatarCache.size >= 64) {
+      avatarCache.delete(avatarCache.keys().next().value);
+    }
+    avatarCache.set(url, entry);
+    console.log("[twitch] avatar listo (" + bytes.length + " bytes)");
+    return entry;
+  } catch (err) {
+    console.warn("[twitch] no se pudo descargar el avatar: " + err.message);
+    return null;
+  }
+}
+
+/**
  * Devuelve el canal público de Twitch y si está en vivo. No necesita la
  * cuenta vinculada: el nombre del canal es público.
  */
@@ -88,13 +141,38 @@ async function resolveChannel(login) {
   }
 
   const stream = user.stream || null;
-  return {
+  const info = {
     login: user.login,
     displayName: user.displayName || user.login,
+    avatarUrl: user.profileImageURL || "",
     live: Boolean(stream && stream.type === "live"),
     title: stream ? stream.title || "" : "",
     viewers: stream ? Number(stream.viewersCount) || 0 : 0
   };
+
+  const avatar = await avatarPayload(info.avatarUrl);
+  if (avatar) {
+    info.avatarBase64 = avatar.base64;
+    info.avatarContentType = avatar.contentType;
+  }
+
+  return info;
+}
+
+/** Foto del canal lista para servir desde el backend (base64 + tipo). */
+async function resolveAvatar(login) {
+  const clean = normalizeLogin(login);
+  if (!validLogin(clean)) {
+    throw new RelayError(400, "El nombre del canal de Twitch no es válido.");
+  }
+
+  const data = await gql(USER_QUERY, { login: clean });
+  const user = data && data.data && data.data.user;
+  if (!user || !user.profileImageURL) {
+    return null;
+  }
+
+  return avatarPayload(user.profileImageURL);
 }
 
 /** URL HLS de la emisión en vivo, con token de reproducción recién pedido. */
@@ -376,8 +454,13 @@ class RelayManager {
         windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"]
       });
+      console.log(
+        "[relay] ffmpeg " + record.platform + " pid=" + proc.pid +
+        " -> " + record.url.replace(/\/[^/]+$/, "/***")
+      );
     } catch (err) {
       this.fail(record, "No se pudo iniciar ffmpeg: " + err.message);
+      console.error("[relay] ffmpeg " + record.platform + ": " + err.message);
       return;
     }
 
@@ -445,6 +528,10 @@ class RelayManager {
 
       record.error = detail;
       record.state = "restarting";
+      console.error(
+        "[relay] ffmpeg " + record.platform + " salió con código " + code +
+        ". Reintentando. " + detail
+      );
       this.scheduleRestart(record, config.relay.restartDelayMs);
     });
   }
@@ -458,6 +545,7 @@ class RelayManager {
         "Se agotaron los reintentos para " + record.platform + ". " +
         (record.error || "");
       this.lastError = record.error;
+      console.error("[relay] " + record.error);
       return;
     }
 
@@ -506,6 +594,7 @@ module.exports = {
   relay,
   RelayError,
   resolveChannel,
+  resolveAvatar,
   resolveHlsUrl,
   normalizeLogin,
   validLogin

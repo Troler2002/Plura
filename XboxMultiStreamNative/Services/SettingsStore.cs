@@ -122,7 +122,7 @@ namespace Plura.Services
 
         public string LoadBackendUrl()
         {
-            return ReadString(BackendUrlKey, "http://192.168.1.57:8787");
+            return ReadString(BackendUrlKey, "http://192.168.1.98:8787");
         }
 
         public void SaveBackendUrl(string url)
