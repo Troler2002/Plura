@@ -9,6 +9,7 @@ XboxMultiStreamNative/AppPackages/
 # Local logs and temporary packages
 *.log
 *.msix
+*.msixupload
 *.appx
 *.appxbundle
 
