@@ -26,6 +26,16 @@ Xbox  ──Transmitir (nativo)──►  Twitch
 La interfaz es **roja y negra**, se maneja con el **mando** y usa **switches** para
 elegir exactamente a qué plataformas quieres transmitir (todas o solo algunas).
 
+## Estado de publicación
+
+La versión de la Microsoft Store se llama **Plura Multistream**
+(Store ID `9P1R7RRWPMF0`, PFN `Troler2002.PluraMultistream_r94ygybagfcxc`). El
+nombre exacto «Plura» no estaba disponible para reservar, así que la primera
+submission se envió a certificación con ese nombre visible el 26/11/2026. El
+enlace público de la Store se añadirá aquí cuando la certificación termine.
+Los despliegues locales de desarrollo (`Plura.OnDevice`) siguen apareciendo en
+la consola como **Plura**.
+
 ---
 
 ## Cómo funciona
@@ -64,7 +74,7 @@ elegir exactamente a qué plataformas quieres transmitir (todas o solo algunas).
 
 | Elemento | Detalle |
 |---|---|
-| Consola | Xbox Series X/S o Xbox One con **Modo Desarrollador** activo |
+| Consola | Xbox Series X/S o Xbox One; Store al publicarse o **Modo Desarrollador** para sideload |
 | Emisión nativa | La Xbox emite a Twitch con la cuenta configurada en la consola |
 | Red | La consola debe tener acceso a Internet (Twitch y servidores RTMP) |
 | Backend | **Ninguno**. Node.js y ffmpeg ya no son necesarios |
@@ -81,9 +91,9 @@ elegir exactamente a qué plataformas quieres transmitir (todas o solo algunas).
 4. La app sin PC aparece en la consola como **Plura** (`Plura.OnDevice`). Los
    despliegues antiguos (`PluraLoose`, `PluraNative` y `Plura.Xbox`) se conservan.
 
-> La instalación requiere Modo Desarrollador. Publicar en la Store de Xbox requiere un
-> acuerdo de partner con Microsoft; no es algo que se pueda hacer con un certificado
-> autofirmado.
+> Hasta que la certificación de la Store termine, la instalación requiere Modo
+> Desarrollador. La versión publicada se instalará desde la Microsoft Store con el
+> nombre **Plura Multistream**; no necesitará Modo Desarrollador.
 
 ---
 
@@ -95,8 +105,8 @@ elegir exactamente a qué plataformas quieres transmitir (todas o solo algunas).
    (también puedes escribirlo). La comprobación se hace sola al dejar de escribir, o
    con **Comprobar canal**. La app muestra la foto del canal y si está en vivo.
 3. **Destinos**: pega la clave de cada plataforma con el botón **Pegar** (en Kick,
-   **clave de retransmisión**) y
-   actívalas con sus switches. Twitch aparece como **ORIGEN** y no se puede desactivar.
+   **clave de retransmisión**) y actívalas con sus switches. Los switches controlan
+   solo los destinos (Kick, YouTube y Facebook Gaming); Twitch es únicamente el origen.
 4. **Emitir**: en la Xbox abre la emisión nativa a Twitch. Cuando el canal figure
    **EN VIVO**, pulsa **▶ Iniciar**.
 
@@ -237,12 +247,14 @@ plura/
   de Xbox). El modo consola usa la emisión nativa a Twitch y la multiplica.
 - El relay necesita que el canal de Twitch esté en vivo y que la cuenta permita la
   emisión desde la Xbox. El HLS de Twitch usa una API no oficial y puede cambiar.
-- **Ejecución extendida**: al iniciar el relay se pide una sesión
-  `ExtendedExecutionForegroundSession` para seguir publicando cuando el juego pase al
-  frente. Si Xbox la rechaza, se intenta la sesión extendida básica; no está garantizada.
+- **Ejecución extendida**: al iniciar el relay se pide una sesión básica
+  `ExtendedExecutionSession` (sin capacidades restringidas) junto con
+  `backgroundMediaPlayback`. Si Xbox la revoca, el supervisor interno reanuda el relay
+  al volver a la app; la concesión depende del sistema.
 - El viaje ida y vuelta por Twitch añade latencia respecto a una captura directa, que no
   existe para apps de terceros en Xbox.
-- La app se instala en **Modo Desarrollador**, no desde la Store.
+- La primera versión de Store está en certificación; hasta que esté publicada, el
+  sideload sigue requiriendo **Modo Desarrollador**.
 - Solo se admiten redes con servidor de ingesta fijo y clave manual. **TikTok** (URL por
   cuenta/región) y **Plura** (servidor propio) no encajan en el flujo de una sola clave
   y no aparecen en esta versión.

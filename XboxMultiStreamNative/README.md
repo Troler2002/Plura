@@ -4,6 +4,11 @@ App **UWP nativa (C# + XAML)** para consolas Xbox. Se llama **Plura** en la cons
 el tema rojo/negro. **No usa WebView**: toda la interfaz es XAML nativo y toda la lógica
 de red es C#.
 
+> La versión enviada a la Microsoft Store se publica como **Plura Multistream**
+> (Store ID `9P1R7RRWPMF0`) porque el nombre exacto «Plura» no estaba disponible.
+> Está en certificación desde el 26/11/2026. El sideload de desarrollo conserva el
+> nombre **Plura** y la identidad `Plura.OnDevice`.
+
 ## Qué hace
 
 - Interfaz de TV con navegación por **mando** (foco, `XYFocusKeyboardNavigation`, TV-safe).
@@ -48,8 +53,8 @@ No se necesita PC, backend, capturadora ni OBS.
 
 **Segundo plano y reanudación:** al pulsar **Iniciar**, la app guarda la intención de
 emisión en `LocalSettings` **antes** de conectar, mantiene vivo el proceso con un audio
-silencioso categorizado como `GameMedia` (no tapa el audio del juego) y conserva la
-ejecución extendida. El relay sigue emitiendo si vuelves al juego o al dashboard. Si el
+silencioso categorizado como `Media` y pide una sesión básica de ejecución extendida
+(sin capacidades restringidas). El relay sigue emitiendo si vuelves al juego o al dashboard. Si el
 sistema cierra la app, al abrirla se reanuda automáticamente. Un supervisor interno
 comprueba cada 2 segundos el estado, espera a que Twitch esté en vivo y vuelve a iniciar
 los destinos si se cayeron o si dejaron de recibir media durante 45 segundos. Al abrir la
@@ -96,22 +101,28 @@ textos.
 Si Visual Studio pide asociar la consola, usa **Device Portal** (Modo Desarrollador) con la
 IP y el código de emparejamiento que muestra la consola.
 
-### Firma
+### Firma e identidad
 
 - Certificado de desarrollo: `Plura_TemporaryKey.pfx`
 - Contraseña: `PluraDev123`
 - Certificado público para instalar en la consola: `Plura_Dev.cer`
 - Huella (thumbprint): `E3C8A19C9120E4636D5B4A6FD56C968B7FE3B81D`
+- Manifiesto de la Store: `Troler2002.PluraMultistream`,
+  `CN=5110E329-4540-4E9B-B5DE-A8D6F794F31C`. `build-store.ps1` compila sin firma para
+  que Microsoft aplique la suya al subir el paquete.
 
-El `Publisher` del manifiesto (`CN=Plura`) debe coincidir con el certificado. Si regeneras
-el certificado, actualiza `PackageCertificateThumbprint` en `Plura.csproj` y el `Publisher`
-en `Package.appxmanifest`.
+El certificado de desarrollo (`CN=Plura`) sirve para sideload. Para desplegar a mano,
+usa una copia del manifiesto con `Publisher=CN=Plura` e identidad `Plura.OnDevice`:
+el `Publisher` debe coincidir con el certificado. No cambies la identidad de la Store
+si vas a generar una nueva versión para Partner Center.
 
 ### Identidad instalada en la consola
 
-El paquete que funciona sin PC usa la identidad `Plura.OnDevice` y aparece en la consola
-como **Plura**. Así convive con los despliegues anteriores (`PluraLoose`, `PluraNative` y
-`Plura.Xbox`), que conservan la identidad `Plura.Xbox` y no se modifican.
+Los despliegues de desarrollo verificados usan la identidad `Plura.OnDevice` y aparecen
+en la consola como **Plura**. Así conviven con los despliegues anteriores
+(`PluraLoose`, `PluraNative` y `Plura.Xbox`), que conservan la identidad `Plura.Xbox` y
+no se modifican. El paquete de la Store usa `Troler2002.PluraMultistream` y el nombre
+visible **Plura Multistream**.
 
 - Paquete Release: `Plura_1.0.0.80_x64.msix` (compilado con .NET Native)
 - Nombre completo instalado: `Plura.OnDevice_1.0.0.80_x64__e3cqhx40v3yww`
@@ -139,7 +150,7 @@ sin borrar las versiones anteriores.
 ```
 XboxMultiStreamNative/
 ├── Plura.csproj                  ← proyecto UWP (x64 / ARM64, firma)
-├── Package.appxmanifest          ← DisplayName Plura, fondo #050506, capacidades
+├── Package.appxmanifest          ← identidad Store, DisplayName Plura Multistream, capacidades
 ├── Plura_TemporaryKey.pfx        ← certificado de desarrollo
 ├── Plura_Dev.cer                 ← certificado público
 ├── App.xaml / App.xaml.cs        ← punto de entrada, Frame raíz
@@ -179,13 +190,14 @@ XboxMultiStreamNative/
 ```xml
 <Capability Name="internetClient" />
 <Capability Name="privateNetworkClientServer" />
-<rescap:Capability Name="extendedExecutionUnconstrained" />
+<uap3:Capability Name="backgroundMediaPlayback" />
 ```
 
 `internetClient` es necesario para hablar con Twitch y con los servidores de ingesta;
 `privateNetworkClientServer` se conserva para compatibilidad con despliegues de desarrollo;
-`extendedExecutionUnconstrained` permite pedir una sesión de ejecución extendida en primer
-plano cuando el juego vuelve a la pantalla (solo posible en apps instaladas a mano).
+`backgroundMediaPlayback` mantiene vivo el proceso con un archivo de silencio. La sesión
+extendida básica no necesita capacidades restringidas, así que no se declara
+`extendedExecutionUnconstrained`.
 
 ## Problemas frecuentes
 
@@ -205,12 +217,13 @@ plano cuando el juego vuelve a la pantalla (solo posible en apps instaladas a ma
 - Xbox **no permite** que apps de terceros capturen el juego; el modo consola usa la
   emisión nativa a Twitch.
 - El relay depende del HLS no oficial de Twitch y de que el canal esté en vivo.
-- **Ejecución extendida**: Plura pide una sesión `ExtendedExecutionForegroundSession` al
-  iniciar el relay para que Xbox no la suspenda cuando el juego pase al frente. La concesión
-  depende del sistema; si se rechaza, se intenta la sesión extendida básica.
+- **Ejecución extendida**: Plura pide una sesión básica `ExtendedExecutionSession` al
+  iniciar el relay, sin capacidades restringidas. La concesión depende del sistema; si se
+  revoca, el supervisor interno reanuda el trabajo al volver a la app.
 - El viaje ida y vuelta por Twitch añade latencia frente a una captura directa, que no
   existe para apps de terceros en Xbox.
-- La app se instala en **Modo Desarrollador**; la Store requiere acuerdo de partner.
+- La primera versión de Store está en certificación; hasta que esté publicada, el
+  sideload requiere **Modo Desarrollador**.
 - Solo se admiten redes con servidor de ingesta fijo y clave manual. TikTok (URL por
   cuenta/región) y Plura (servidor propio) quedaron fuera de esta versión.
 
@@ -220,9 +233,11 @@ plano cuando el juego vuelve a la pantalla (solo posible en apps instaladas a ma
   `UnifiedDemuxer`, `RtmpProtocol`, `RtmpPublisher` y `OnDeviceRelayClient`.
 - Bancos de prueba: `PROTOCOL TESTS OK`, `TS TESTS OK` y conversión fMP4 real de Twitch
   (dos segmentos consecutivos con timestamps continuos: `0..1984` y `2000..3968`).
-- Release `1.0.0.45` compilada con .NET Native e instalada en la consola como
-  `Plura.OnDevice_1.0.0.45_x64__e3cqhx40v3yww` sin desinstalar los despliegues anteriores.
-- **Pendiente**: prueba extremo a extremo con el canal en vivo y claves reales de
-  YouTube/Kick/Facebook.
+- Release `1.0.0.80` compilada con .NET Native e instalada en la consola como
+  `Plura.OnDevice_1.0.0.80_x64__e3cqhx40v3yww`, con título real de Twitch y
+  `RTMP publish accepted` verificado en Device Portal.
+- Store: paquete `Plura_1.0.0.0_x64_bundle.msixupload` validado sin errores y enviado a
+  certificación el 26/11/2026.
+- **Pendiente**: resultado de la certificación y enlace público de la Store.
 - La verificación de la interfaz se hace por captura del Device Portal y por
   `LocalState/plura.log`.

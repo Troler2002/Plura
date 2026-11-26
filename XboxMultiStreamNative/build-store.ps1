@@ -21,6 +21,10 @@ Remove-Item -LiteralPath $workRoot -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $workDir | Out-Null
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 
+# Elimina paquetes generados anteriormente para evitar subir una build obsoleta.
+Get-ChildItem -LiteralPath $out -Force | Where-Object { $_.Name -like 'Plura_*' } |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
 & robocopy.exe $projectDir $workDir /E /XD bin obj AppPackages StorePackages /XF *.log /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy falló con código $LASTEXITCODE" }
 

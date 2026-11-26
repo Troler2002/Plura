@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.ExtendedExecution;
-using Windows.ApplicationModel.ExtendedExecution.Foreground;
 
 namespace Plura.Services.Streaming.OnDevice
 {
@@ -539,86 +538,19 @@ namespace Plura.Services.Streaming.OnDevice
 
         private async Task RequestExtendedExecutionAsync(bool force = false)
         {
-            // Sin esta sesión Xbox suspende la app en cuanto el juego pasa al
-            // primer plano. La variante Foreground requiere la capability
-            // restringida extendedExecutionUnconstrained (app instalada a mano).
-            lock (_gate)
-            {
-                if (!_running || _executionRequesting || _basicRequesting) { return; }
-                if (force) { _executionDenied = false; }
-                if (_executionDenied) { return; }
-                _executionRequesting = true;
-            }
-
-            ExtendedExecutionForegroundSession session = null;
-            try
-            {
-                session = new ExtendedExecutionForegroundSession
-                {
-                    Reason = ExtendedExecutionForegroundReason.Unconstrained,
-                    Description = "Plura mantiene el relay de Twitch a otras plataformas"
-                };
-                session.Revoked += (sender, args) =>
-                {
-                    App.Log("Extended execution revoked: " + args.Reason);
-                    lock (_gate)
-                    {
-                        if (ReferenceEquals(_executionSession, session)) { _executionSession = null; }
-                    }
-                    try { session.Dispose(); } catch { }
-
-                    lock (_gate) { if (!_running) { return; } }
-                    // SystemPolicy puede revocar la variante Foreground al
-                    // cambiar de juego. La sesión básica (Unspecified) suele
-                    // sobrevivir mejor; se pide de inmediato para que el relay
-                    // no se congele mientras la app sigue viva.
-                    var ignored = RequestBasicExtendedExecutionAsync();
-                };
-
-                var result = await session.RequestExtensionAsync();
-                App.Log("Extended execution: " + result);
-
-                bool stillRunning;
-                lock (_gate)
-                {
-                    stillRunning = _running;
-                    if (result == ExtendedExecutionForegroundResult.Allowed && stillRunning)
-                    {
-                        _executionSession = session;
-                        _executionDenied = false;
-                        session = null; // la session ya está gestionada; no disposed
-                    }
-                    else
-                    {
-                        _executionDenied = true;
-                    }
-                }
-
-                if (session != null)
-                {
-                    try { session.Dispose(); } catch { }
-                    if (stillRunning)
-                    {
-                        var ignored = RequestBasicExtendedExecutionAsync();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                App.Log("Foreground extended execution failed: " + ex.Message);
-                var ignored = RequestBasicExtendedExecutionAsync();
-            }
-            finally
-            {
-                lock (_gate) { _executionRequesting = false; }
-            }
+            // La Store no permite extendedExecutionUnconstrained sin aprobación.
+            //Usamos la sesión básica (sin capacidades restringidas) junto con
+            //backgroundMediaPlayback para mantener el relay en segundo plano.
+            await RequestBasicExtendedExecutionAsync(force);
         }
 
-        private async Task RequestBasicExtendedExecutionAsync()
+        private async Task RequestBasicExtendedExecutionAsync(bool force = false)
         {
             lock (_gate)
             {
-                if (!_running || _executionRequesting || _basicRequesting) { return; }
+                if (!_running || _basicRequesting) { return; }
+                if (force) { _executionDenied = false; }
+                if (_executionDenied) { return; }
                 _basicRequesting = true;
             }
 
@@ -649,7 +581,12 @@ namespace Plura.Services.Streaming.OnDevice
                     if (result == ExtendedExecutionResult.Allowed && stillRunning)
                     {
                         _executionSession = session;
+                        _executionDenied = false;
                         session = null;
+                    }
+                    else
+                    {
+                        _executionDenied = true;
                     }
                 }
 

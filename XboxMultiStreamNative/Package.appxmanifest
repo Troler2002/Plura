@@ -7,12 +7,12 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap3 mp rescap">
 
-  <Identity Name="Troler2002.PluraMultistream" Publisher="CN=5110E329-4540-4E9B-B5DE-A8D6F794F31C" Version="1.0.0.81" />
+  <Identity Name="Troler2002.PluraMultistream" Publisher="CN=5110E329-4540-4E9B-B5DE-A8D6F794F31C" Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="b7a3e2c1-9d4f-4a6b-8c2e-5f1a0d3b7c94" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
   <Properties>
-    <DisplayName>Plura</DisplayName>
+    <DisplayName>Plura Multistream</DisplayName>
     <PublisherDisplayName>Troler2002</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -29,7 +29,7 @@
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="Plura.App">
       <uap:VisualElements
-        DisplayName="Plura"
+        DisplayName="Plura Multistream"
         Description="Multistream en la propia Xbox, sin PC ni backend"
         BackgroundColor="#050506"
         Square150x150Logo="Assets\Square150x150Logo.png"
@@ -48,6 +48,5 @@
     <Capability Name="internetClient" />
     <Capability Name="privateNetworkClientServer" />
     <uap3:Capability Name="backgroundMediaPlayback" />
-    <rescap:Capability Name="extendedExecutionUnconstrained" />
   </Capabilities>
 </Package>
