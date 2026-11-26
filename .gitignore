@@ -2,6 +2,8 @@
 XboxMultiStreamNative/bin/
 XboxMultiStreamNative/obj/
 XboxMultiStreamNative/AppPackages/
+StorePackages/
+**/StorePackages/
 **/bin/
 **/obj/
 **/AppPackages/
