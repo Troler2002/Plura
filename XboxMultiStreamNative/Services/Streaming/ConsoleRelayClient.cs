@@ -12,6 +12,9 @@ namespace Plura.Services.Streaming
         public string Platform { get; set; } = string.Empty;
         public string ServerUrl { get; set; } = string.Empty;
         public string StreamKey { get; set; } = string.Empty;
+
+        /// <summary>Slug/cuenta del destino, usado por Kick para PATCH stream-info.</summary>
+        public string AccountLabel { get; set; } = string.Empty;
     }
 
     public sealed class RelayOutputStatus

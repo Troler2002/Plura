@@ -1,0 +1,18 @@
+# Build outputs
+XboxMultiStreamNative/bin/
+XboxMultiStreamNative/obj/
+XboxMultiStreamNative/AppPackages/
+**/bin/
+**/obj/
+**/AppPackages/
+
+# Local logs and temporary packages
+*.log
+*.msix
+*.appx
+*.appxbundle
+
+# Visual Studio / OS noise
+.vs/
+Thumbs.db
+desktop.ini

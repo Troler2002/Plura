@@ -10,157 +10,198 @@
     XYFocusKeyboardNavigation="Enabled">
 
     <Page.Resources>
-        <SolidColorBrush x:Key="PluraRed" Color="#FFE60023" />
-        <SolidColorBrush x:Key="PluraRedDark" Color="#FFB8001C" />
-        <SolidColorBrush x:Key="PluraBlack" Color="#FF050506" />
-        <SolidColorBrush x:Key="PluraCard" Color="#FF111114" />
-        <SolidColorBrush x:Key="PluraCard2" Color="#FF17171B" />
+        <!-- Plura: negro profundo + rojo. El rojo marca la identidad de la app,
+             las acciones y el estado; cada plataforma aporta su propio color. -->
+        <SolidColorBrush x:Key="PluraAccent" Color="#FFE60023" />
+        <SolidColorBrush x:Key="PluraAccentDark" Color="#FFB8001C" />
+        <SolidColorBrush x:Key="PluraBg" Color="#FF050506" />
+        <SolidColorBrush x:Key="PluraSurface" Color="#FF0D0D0F" />
+        <SolidColorBrush x:Key="PluraSurface2" Color="#FF141417" />
+        <SolidColorBrush x:Key="PluraInner" Color="#FF08080A" />
         <SolidColorBrush x:Key="PluraText" Color="#FFF4F4F6" />
-        <SolidColorBrush x:Key="PluraMuted" Color="#FF9B9BA4" />
+        <SolidColorBrush x:Key="PluraMuted" Color="#FF9A9AA3" />
         <SolidColorBrush x:Key="PluraBorder" Color="#1FFFFFFF" />
-        <SolidColorBrush x:Key="PluraBorderRed" Color="#66E60023" />
+        <SolidColorBrush x:Key="PluraCardBorder" Color="#29E60023" />
+        <SolidColorBrush x:Key="PluraBorderAccent" Color="#66E60023" />
+        <SolidColorBrush x:Key="PluraSuccess" Color="#FF4ADE80" />
+        <SolidColorBrush x:Key="PluraWarning" Color="#FFFFB020" />
 
-        <!-- La consola pinta los campos de texto en blanco al enfocarlos; se
-             fuerzan los colores oscuros de Plura también en foco. -->
-        <SolidColorBrush x:Key="TextControlBackground" Color="#FF0A0A0C" />
-        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FF0A0A0C" />
-        <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FF0A0A0C" />
-        <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#FF0A0A0C" />
+        <!-- La Xbox pinta los campos en blanco al enfocarlos; se fuerzan los
+             colores oscuros de Plura también en foco. -->
+        <SolidColorBrush x:Key="TextControlBackground" Color="#FF08080A" />
+        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FF08080A" />
+        <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FF08080A" />
+        <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#FF08080A" />
         <SolidColorBrush x:Key="TextControlBorderBrush" Color="#26FFFFFF" />
         <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#4DFFFFFF" />
         <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#FFE60023" />
         <SolidColorBrush x:Key="TextControlForeground" Color="#FFF4F4F6" />
         <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#FFF4F4F6" />
         <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#FFF4F4F6" />
-        <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#FF9B9BA4" />
-        <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#FF9B9BA4" />
+        <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#FF9A9AA3" />
+        <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#FF9A9AA3" />
 
-        <Style x:Key="PluraCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource PluraCard}" />
+        <!-- Superficies -->
+        <Style x:Key="PluraSurfaceStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PluraSurface}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PluraCardBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="22,18" />
+        </Style>
+
+        <Style x:Key="PlatformCardStyle" TargetType="Border" BasedOn="{StaticResource PluraSurfaceStyle}">
+            <Setter Property="Background" Value="{StaticResource PluraSurface2}" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+        </Style>
+
+        <Style x:Key="PluraInnerStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PluraInner}" />
             <Setter Property="BorderBrush" Value="{StaticResource PluraBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="14" />
-            <Setter Property="Padding" Value="20" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="14,11" />
         </Style>
 
-        <Style x:Key="PlatformCardStyle" TargetType="Border" BasedOn="{StaticResource PluraCardStyle}">
-            <Setter Property="Background" Value="{StaticResource PluraCard2}" />
-            <Setter Property="Padding" Value="16" />
-            <Setter Property="Margin" Value="0,0,0,12" />
+        <Style x:Key="PluraMetricStyle" TargetType="Border" BasedOn="{StaticResource PluraInnerStyle}">
+            <Setter Property="Padding" Value="11,8" />
         </Style>
 
+        <Style x:Key="PluraStepStyle" TargetType="Border" BasedOn="{StaticResource PluraInnerStyle}">
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+
+        <Style x:Key="PluraPillStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PluraSurface2}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PluraBorderAccent}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Padding" Value="9,4" />
+        </Style>
+
+        <Style x:Key="PluraAccentPillStyle" TargetType="Border" BasedOn="{StaticResource PluraPillStyle}">
+            <Setter Property="Background" Value="#33E60023" />
+        </Style>
+
+        <!-- Tipografía -->
         <Style x:Key="SectionTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="21" />
-            <Setter Property="FontWeight" Value="Black" />
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource PluraText}" />
         </Style>
 
         <Style x:Key="FieldLabel" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource PluraMuted}" />
-            <Setter Property="CharacterSpacing" Value="40" />
-            <Setter Property="Margin" Value="0,0,0,5" />
+            <Setter Property="CharacterSpacing" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,6" />
         </Style>
 
         <Style x:Key="HintText" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="LineHeight" Value="20" />
             <Setter Property="Foreground" Value="{StaticResource PluraMuted}" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
 
         <Style x:Key="StatLabel" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="10" />
-            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource PluraMuted}" />
-            <Setter Property="CharacterSpacing" Value="60" />
+            <Setter Property="CharacterSpacing" Value="0" />
         </Style>
 
         <Style x:Key="StatValue" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="17" />
-            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="19" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource PluraText}" />
-            <Setter Property="Margin" Value="0,3,0,0" />
+            <Setter Property="Margin" Value="0,4,0,0" />
         </Style>
 
+        <!-- Acciones -->
         <Style x:Key="PluraPrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource PluraRed}" />
-            <Setter Property="Foreground" Value="{StaticResource PluraBlack}" />
+            <Setter Property="Background" Value="{StaticResource PluraAccent}" />
+            <Setter Property="Foreground" Value="#FFFFFFFF" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="CornerRadius" Value="9" />
-            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="FontSize" Value="15" />
-            <Setter Property="Padding" Value="20,10" />
-            <Setter Property="MinHeight" Value="46" />
+            <Setter Property="Padding" Value="22,10" />
+            <Setter Property="MinHeight" Value="48" />
         </Style>
 
         <Style x:Key="PluraSecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#FF1A1A1F" />
+            <Setter Property="Background" Value="{StaticResource PluraSurface2}" />
             <Setter Property="Foreground" Value="{StaticResource PluraText}" />
             <Setter Property="BorderBrush" Value="{StaticResource PluraBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="Padding" Value="16,9" />
-            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="MinHeight" Value="44" />
         </Style>
 
         <Style x:Key="PluraSmallButton" TargetType="Button" BasedOn="{StaticResource PluraSecondaryButton}">
             <Setter Property="FontSize" Value="13" />
-            <Setter Property="Padding" Value="12,6" />
-            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="MinHeight" Value="38" />
         </Style>
 
         <Style x:Key="PluraDangerButton" TargetType="Button">
-            <Setter Property="Background" Value="#FF1C0A0D" />
-            <Setter Property="Foreground" Value="#FFFF6B7A" />
-            <Setter Property="BorderBrush" Value="#55FF3B4E" />
+            <Setter Property="Background" Value="{StaticResource PluraAccentDark}" />
+            <Setter Property="Foreground" Value="#FFFFFFFF" />
+            <Setter Property="BorderBrush" Value="{StaticResource PluraAccent}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="9" />
-            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="FontSize" Value="15" />
-            <Setter Property="Padding" Value="20,10" />
-            <Setter Property="MinHeight" Value="46" />
+            <Setter Property="Padding" Value="22,10" />
+            <Setter Property="MinHeight" Value="48" />
         </Style>
 
         <Style x:Key="PluraSmallDangerButton" TargetType="Button" BasedOn="{StaticResource PluraDangerButton}">
             <Setter Property="FontSize" Value="13" />
-            <Setter Property="Padding" Value="12,6" />
-            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Padding" Value="11,7" />
+            <Setter Property="MinHeight" Value="38" />
         </Style>
 
+        <!-- Campos -->
         <Style x:Key="PluraTextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="#FF0A0A0C" />
+            <Setter Property="Background" Value="{StaticResource PluraInner}" />
             <Setter Property="Foreground" Value="{StaticResource PluraText}" />
             <Setter Property="BorderBrush" Value="#26FFFFFF" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="12,9" />
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="MinHeight" Value="46" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="PluraPasswordBox" TargetType="PasswordBox">
-            <Setter Property="Background" Value="#FF0A0A0C" />
+            <Setter Property="Background" Value="{StaticResource PluraInner}" />
             <Setter Property="Foreground" Value="{StaticResource PluraText}" />
             <Setter Property="BorderBrush" Value="#26FFFFFF" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="12,9" />
             <Setter Property="FontSize" Value="15" />
-            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="MinHeight" Value="44" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="PluraComboBox" TargetType="ComboBox">
-            <Setter Property="Background" Value="#FF0A0A0C" />
+            <Setter Property="Background" Value="{StaticResource PluraInner}" />
             <Setter Property="Foreground" Value="{StaticResource PluraText}" />
             <Setter Property="BorderBrush" Value="#26FFFFFF" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Padding" Value="10,7" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="MinHeight" Value="42" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -171,750 +212,678 @@
             <Setter Property="OffContent" Value="NO" />
             <Setter Property="MinWidth" Value="0" />
             <Setter Property="Foreground" Value="{StaticResource PluraText}" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
     </Page.Resources>
 
-    <Grid Background="{StaticResource PluraBlack}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <!-- La interfaz se dibuja a 1920x1080 y se escala uniformemente a cualquier
+         pantalla o posterior de la Xbox: no se recorta nada y el texto sigue nítido. -->
+    <Grid x:Name="AppRoot">
+        <Viewbox Stretch="Uniform" StretchDirection="Both">
+            <Grid Width="1920" Height="1080" Background="{StaticResource PluraBg}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="96" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="52" />
+                </Grid.RowDefinitions>
 
-        <!-- ================= CABECERA ================= -->
-        <Border Grid.Row="0"
-                Background="#FF0B0B0D"
-                BorderBrush="{StaticResource PluraBorderRed}"
-                BorderThickness="0,0,0,1"
-                Padding="48,16,48,16">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+                <!-- ================= CABECERA ================= -->
+                <Border Grid.Row="0"
+                        Background="#FF070709"
+                        BorderBrush="{StaticResource PluraBorderAccent}"
+                        BorderThickness="0,0,0,1"
+                        Padding="40,0,40,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                    <Border Width="54" Height="54" CornerRadius="14" Background="{StaticResource PluraRed}">
-                        <TextBlock Text="P"
-                                   FontSize="30"
-                                   FontWeight="Black"
-                                   Foreground="{StaticResource PluraBlack}"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel VerticalAlignment="Center" Spacing="2">
-                        <TextBlock Text="PLURA"
-                                   FontSize="26"
-                                   FontWeight="Black"
-                                   Foreground="{StaticResource PluraText}"
-                                   CharacterSpacing="120" />
-                        <TextBlock Text="Multistream para Xbox"
-                                   FontSize="13"
-                                   Foreground="{StaticResource PluraMuted}" />
-                    </StackPanel>
-                </StackPanel>
-
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <Border x:Name="GlobalStatusPill"
-                            Background="#FF1E1E22"
-                            CornerRadius="10"
-                            Padding="12,8"
-                            VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Ellipse x:Name="GlobalStatusDot"
-                                     Width="9" Height="9"
-                                     Fill="{StaticResource PluraMuted}"
-                                     VerticalAlignment="Center" />
-                            <TextBlock x:Name="GlobalStatusText"
-                                       Text="DETENIDO"
-                                       FontSize="12"
-                                       FontWeight="Bold"
-                                       CharacterSpacing="40"
-                                       Foreground="{StaticResource PluraMuted}"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-
-                    <Button x:Name="StartButton"
-                            Content="▶  Iniciar stream"
-                            Style="{StaticResource PluraPrimaryButton}"
-                            Click="StartButton_Click" />
-
-                    <Button x:Name="StopButton"
-                            Content="■  Detener"
-                            Style="{StaticResource PluraDangerButton}"
-                            Click="StopButton_Click"
-                            IsEnabled="False" />
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- ================= CONTENIDO ================= -->
-        <ScrollViewer Grid.Row="1"
-                      Padding="48,24,48,24"
-                      VerticalScrollMode="Enabled"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollMode="Disabled"
-                      HorizontalScrollBarVisibility="Disabled"
-                      IsTabStop="False">
-            <StackPanel Spacing="18">
-
-                <!-- Guía rápida -->
-                <Border Style="{StaticResource PluraCardStyle}">
-                    <StackPanel Spacing="10">
-                        <Grid>
-                            <TextBlock Text="Guía rápida" Style="{StaticResource SectionTitle}" />
-                            <Border HorizontalAlignment="Right"
-                                    VerticalAlignment="Center"
-                                    Background="#33E60023"
-                                    BorderBrush="{StaticResource PluraBorderRed}"
-                                    BorderThickness="1"
-                                    CornerRadius="9"
-                                    Padding="10,6">
-                                <TextBlock Text="MODO CONSOLA"
-                                           FontSize="12"
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                            <Border Width="8" Height="46" Background="{StaticResource PluraAccent}" CornerRadius="4" />
+                            <StackPanel Spacing="0" VerticalAlignment="Center">
+                                <TextBlock Text="PLURA"
+                                           FontSize="25"
                                            FontWeight="Bold"
-                                           CharacterSpacing="40"
-                                           Foreground="{StaticResource PluraRed}" />
-                            </Border>
-                        </Grid>
-                        <TextBlock Style="{StaticResource HintText}"
-                                   Text="Todo funciona desde la Xbox. No necesitas PC, capturadora ni OBS." />
-                        <Grid ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="#FF0A0A0C" BorderBrush="{StaticResource PluraBorder}" BorderThickness="1" CornerRadius="9" Padding="14,10">
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="1 · EMITE EN XBOX" Style="{StaticResource FieldLabel}" Foreground="{StaticResource PluraRed}" />
-                                    <TextBlock Style="{StaticResource HintText}" Text="Guía → Capturar y compartir → Emisión en directo → Twitch → Ir en directo." />
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="1" Background="#FF0A0A0C" BorderBrush="{StaticResource PluraBorder}" BorderThickness="1" CornerRadius="9" Padding="14,10">
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="2 · COMPRUEBA EL CANAL" Style="{StaticResource FieldLabel}" Foreground="{StaticResource PluraRed}" />
-                                    <TextBlock Style="{StaticResource HintText}" Text="Escribe tu canal de Twitch. Debe aparecer EN VIVO." />
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="2" Background="#FF0A0A0C" BorderBrush="{StaticResource PluraBorder}" BorderThickness="1" CornerRadius="9" Padding="14,10">
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="3 · INICIA EL RELAY" Style="{StaticResource FieldLabel}" Foreground="{StaticResource PluraRed}" />
-                                    <TextBlock Style="{StaticResource HintText}" Text="Activa tus destinos y pulsa Iniciar relay. Plura reparte la señal." />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- Modo consola -->
-                <Border x:Name="ConsoleCard" Style="{StaticResource PluraCardStyle}">
-                    <StackPanel Spacing="14">
-                        <Grid>
-                            <TextBlock Text="Modo consola · Twitch como origen"
-                                       Style="{StaticResource SectionTitle}" />
-                            <Border x:Name="RelayStatusPill"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Center"
-                                    Background="#FF1E1E22"
-                                    CornerRadius="9"
-                                    Padding="10,6">
-                                <TextBlock x:Name="RelayStatusText"
-                                           Text="RELAY DETENIDO"
-                                           FontSize="12"
-                                           FontWeight="Bold"
-                                           Foreground="{StaticResource PluraMuted}" />
-                            </Border>
-                        </Grid>
-
-                        <TextBlock Style="{StaticResource HintText}"
-                                   Text="La Xbox emite con su función nativa a Twitch. El backend de Plura recibe esa señal y la reenvía a las plataformas que actives, sin PC ni capturadora en tu casa. Twitch es el origen: las demás plataformas son los destinos." />
-
-                        <Grid ColumnSpacing="10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <Grid x:Name="ChannelAvatarBorder"
-                                  Grid.Column="0"
-                                  Width="56"
-                                  Height="56"
-                                  Margin="0,0,0,2"
-                                  VerticalAlignment="Bottom">
-                                <Border x:Name="ChannelAvatarImage"
-                                        CornerRadius="28"
-                                        Background="#FF1E1E22" />
-                                <TextBlock x:Name="ChannelAvatarFallback"
-                                           Text="T"
-                                           FontSize="22"
-                                           FontWeight="Bold"
-                                           Foreground="#FF9146FF"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center" />
-                            </Grid>
-
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="CANAL DE TWITCH" Style="{StaticResource FieldLabel}" />
-                                <TextBox x:Name="TwitchChannelBox"
-                                         Style="{StaticResource PluraTextBox}"
-                                         PlaceholderText="tu_canal o enlace de twitch.tv"
-                                         TextChanged="TwitchChannelBox_TextChanged" />
-                            </StackPanel>
-
-                            <Button x:Name="PasteChannelButton"
-                                    Grid.Column="2"
-                                    Content="Pegar"
-                                    Style="{StaticResource PluraSecondaryButton}"
-                                    VerticalAlignment="Bottom"
-                                    Click="PasteTwitchChannel_Click" />
-
-                            <Button x:Name="CheckChannelButton"
-                                    Grid.Column="3"
-                                    Content="Comprobar canal"
-                                    Style="{StaticResource PluraSecondaryButton}"
-                                    VerticalAlignment="Bottom"
-                                    Click="CheckChannel_Click" />
-                        </Grid>
-
-                        <Border Background="#FF0A0A0C"
-                                BorderBrush="{StaticResource PluraBorder}"
-                                BorderThickness="1"
-                                CornerRadius="9"
-                                Padding="14,10">
-                            <Grid ColumnSpacing="12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0" Spacing="5" VerticalAlignment="Center">
-                                    <TextBlock x:Name="ChannelStatusText"
-                                               Text="Escribe el canal de Twitch que emite desde la Xbox."
-                                               FontSize="14"
-                                               FontWeight="Bold"
-                                               TextWrapping="Wrap"
-                                               Foreground="{StaticResource PluraText}" />
-                                    <TextBlock x:Name="RelayDetailText"
-                                               Text="El relay se inicia con el botón Iniciar de arriba."
-                                               Style="{StaticResource HintText}" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-
-                        <TextBlock Style="{StaticResource HintText}"
-                                   Text="PASOS · 1) En la Xbox: Guía → Capturar y compartir → Emisión en directo → Twitch → Ir en directo. 2) Vuelve a Plura, comprueba que el canal aparece EN VIVO y pulsa Iniciar. 3) Plura mantiene el relay mientras juegas; si una plataforma se cae, se reconecta sola." />
-                    </StackPanel>
-                </Border>
-
-                <!-- Conexión OBS (legado, oculto: la app es solo consola) -->
-                <Border x:Name="ObsCard" Style="{StaticResource PluraCardStyle}" Visibility="Collapsed">
-                    <StackPanel Spacing="14">
-                        <Grid>
-                            <TextBlock Text="Conexión con OBS" Style="{StaticResource SectionTitle}" />
-                            <Border x:Name="ObsStatusPill"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Center"
-                                    Background="#FF1E1E22"
-                                    CornerRadius="9"
-                                    Padding="10,6">
-                                <TextBlock x:Name="ObsStatusText"
-                                           Text="Sin conectar"
-                                           FontSize="12"
-                                           FontWeight="Bold"
-                                           Foreground="{StaticResource PluraMuted}" />
-                            </Border>
-                        </Grid>
-
-                        <TextBlock Style="{StaticResource HintText}"
-                                   Text="OBS corre en tu PC. En Xbox escribe la IP LAN del PC (por ejemplo 192.168.1.20); localhost no funciona en la consola." />
-
-                        <Grid ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="HOST OBS" Style="{StaticResource FieldLabel}" />
-                                <TextBox x:Name="ObsHostBox"
-                                         Style="{StaticResource PluraTextBox}"
-                                         PlaceholderText="192.168.1.20"
-                                         TextChanged="ObsHostBox_TextChanged" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="PUERTO" Style="{StaticResource FieldLabel}" />
-                                <TextBox x:Name="ObsPortBox"
-                                         Style="{StaticResource PluraTextBox}"
-                                         PlaceholderText="4455"
-                                         InputScope="Number"
-                                         TextChanged="ObsPortBox_TextChanged" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="CONTRASEÑA" Style="{StaticResource FieldLabel}" />
-                                <PasswordBox x:Name="ObsPasswordBox"
-                                             Style="{StaticResource PluraPasswordBox}"
-                                             PlaceholderText="Contraseña del WebSocket"
-                                             PasswordChanged="ObsPasswordBox_PasswordChanged" />
-                            </StackPanel>
-
-                            <Button x:Name="TestObsButton"
-                                    Grid.Column="3"
-                                    Content="Probar conexión"
-                                    Style="{StaticResource PluraSecondaryButton}"
-                                    VerticalAlignment="Bottom"
-                                    Click="TestObsButton_Click" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- Backend -->
-                <Border Style="{StaticResource PluraCardStyle}">
-                    <StackPanel Spacing="14">
-                        <Grid>
-                            <TextBlock Text="Backend de Plura" Style="{StaticResource SectionTitle}" />
-                            <TextBlock x:Name="BackendStatusText"
-                                       Text="Sin probar"
-                                       HorizontalAlignment="Right"
-                                       VerticalAlignment="Center"
-                                       FontSize="12"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource PluraMuted}" />
-                        </Grid>
-
-                        <TextBlock Style="{StaticResource HintText}"
-                                   Text="El backend recibe la emisión de Twitch y la reparte a tus destinos. Puede correr en un equipo de tu red o en un servidor; escribe aquí su dirección. Plura no pide cuentas ni contraseñas: cada plataforma usa solo su Stream Key." />
-
-                        <Grid ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="URL DEL BACKEND" Style="{StaticResource FieldLabel}" />
-                                <TextBox x:Name="BackendUrlBox"
-                                         Style="{StaticResource PluraTextBox}"
-                                         PlaceholderText="http://192.168.1.98:8787"
-                                         TextChanged="BackendUrlBox_TextChanged" />
-                            </StackPanel>
-
-                            <Button x:Name="TestBackendButton"
-                                    Grid.Column="1"
-                                    Content="Probar backend"
-                                    Style="{StaticResource PluraSecondaryButton}"
-                                    VerticalAlignment="Bottom"
-                                    Click="TestBackend_Click" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- Plataformas -->
-                <Border Style="{StaticResource PluraCardStyle}">
-                    <StackPanel Spacing="14">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0" Spacing="4">
-                                <TextBlock Text="Plataformas" Style="{StaticResource SectionTitle}" />
-                                <TextBlock Style="{StaticResource HintText}"
-                                           Text="Activa con cada switch las plataformas a las que quieres transmitir. Puedes elegir todas o solo algunas." />
-                            </StackPanel>
-
-                            <Border Grid.Column="1"
-                                    Background="#FF17171B"
-                                    BorderBrush="{StaticResource PluraBorderRed}"
-                                    BorderThickness="1"
-                                    CornerRadius="11"
-                                    Padding="14,9"
-                                    VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <StackPanel VerticalAlignment="Center" Spacing="1">
-                                        <TextBlock Text="Transmitir en todas"
-                                                   FontSize="14"
-                                                   FontWeight="Bold"
-                                                   Foreground="{StaticResource PluraText}" />
-                                        <TextBlock Text="Activa o desactiva todas a la vez"
-                                                   FontSize="11"
-                                                   Foreground="{StaticResource PluraMuted}" />
-                                    </StackPanel>
-                                    <ToggleSwitch x:Name="MasterToggle"
-                                                  Style="{StaticResource PluraToggle}"
-                                                  Toggled="MasterToggle_Toggled" />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <Border Background="#14E60023"
-                                BorderBrush="{StaticResource PluraBorderRed}"
-                                BorderThickness="1"
-                                CornerRadius="11"
-                                Padding="14,10">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="VAS A TRANSMITIR A"
+                                           Foreground="{StaticResource PluraText}"
+                                           CharacterSpacing="0" />
+                                <TextBlock Text="MULTISTREAM · XBOX"
                                            FontSize="11"
-                                           FontWeight="Black"
-                                           CharacterSpacing="80"
-                                           Foreground="{StaticResource PluraMuted}" />
-                                <TextBlock x:Name="SelectionSummary"
-                                           Text="Ninguna plataforma seleccionada. Activa al menos un switch."
-                                           FontSize="15"
-                                           FontWeight="Bold"
-                                           TextWrapping="Wrap"
-                                           Foreground="{StaticResource PluraText}" />
-                                <ItemsControl ItemsSource="{Binding SelectionChips}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal" Spacing="8" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="{Binding Background}"
-                                                    BorderBrush="{Binding Border}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="12"
-                                                    Padding="10,5"
-                                                    Margin="0,0,8,0"
-                                                    Opacity="{Binding Opacity}">
-                                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                                    <Ellipse Width="8" Height="8"
-                                                             Fill="{Binding Accent}"
-                                                             VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding Name}"
-                                                               FontSize="13"
-                                                               FontWeight="Bold"
-                                                               Foreground="{Binding Foreground}" />
+                                           Foreground="{StaticResource PluraAccent}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    MaxWidth="620"
+                                    Margin="30,0,30,0">
+                            <TextBlock Text="TÍTULO DEL DIRECTO · TWITCH"
+                                       Style="{StaticResource StatLabel}"
+                                       Foreground="{StaticResource PluraAccent}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock x:Name="HeaderTitleText"
+                                       Text="Esperando el título de Twitch…"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource PluraText}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <Border x:Name="GlobalStatusPill"
+                                    Style="{StaticResource PluraPillStyle}"
+                                    VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Ellipse x:Name="GlobalStatusDot"
+                                             Width="9" Height="9"
+                                             Fill="{StaticResource PluraMuted}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock x:Name="GlobalStatusText"
+                                               Text="DETENIDO"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               CharacterSpacing="0"
+                                               Foreground="{StaticResource PluraMuted}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border x:Name="StartStatusPill"
+                                    Style="{StaticResource PluraPillStyle}"
+                                    VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Ellipse x:Name="StartStatusDot"
+                                             Width="9" Height="9"
+                                             Fill="{StaticResource PluraMuted}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock x:Name="StartStatusText"
+                                               Text="COMPROBANDO…"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               CharacterSpacing="0"
+                                               Foreground="{StaticResource PluraMuted}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+
+                            <Button x:Name="StartButton"
+                                    Content="▶ Iniciar"
+                                    Style="{StaticResource PluraPrimaryButton}"
+                                    MinWidth="132"
+                                    Click="StartButton_Click" />
+
+                            <Button x:Name="StopButton"
+                                    Content="■ Detener"
+                                    Style="{StaticResource PluraDangerButton}"
+                                    MinWidth="118"
+                                    Click="StopButton_Click"
+                                    IsEnabled="False" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ================= CONTENIDO ================= -->
+                <ScrollViewer Grid.Row="1"
+                              Padding="40,20,40,22"
+                              VerticalScrollMode="Enabled"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollMode="Disabled"
+                              HorizontalScrollBarVisibility="Disabled"
+                              IsTabStop="True">
+                    <StackPanel Spacing="16">
+
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="610" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- COLUMNA IZQUIERDA: FLUJO -->
+                            <StackPanel Grid.Column="0" Spacing="16">
+
+                                <!-- Estado grande -->
+                                <Border Style="{StaticResource PluraSurfaceStyle}"
+                                        BorderBrush="{StaticResource PluraBorderAccent}"
+                                        Padding="20,18">
+                                    <StackPanel Spacing="12">
+                                        <Grid>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="01 · EMISIÓN"
+                                                           Style="{StaticResource StatLabel}"
+                                                           Foreground="{StaticResource PluraAccent}" />
+                                                <TextBlock Text="Panel de control"
+                                                           Style="{StaticResource SectionTitle}" />
+                                            </StackPanel>
+                                            <Border x:Name="RelayStatusPill"
+                                                    Style="{StaticResource PluraPillStyle}"
+                                                    HorizontalAlignment="Right"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock x:Name="RelayStatusText"
+                                                           Text="RELAY DETENIDO"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           CharacterSpacing="0"
+                                                           Foreground="{StaticResource PluraMuted}" />
+                                            </Border>
+                                        </Grid>
+
+                                        <Border Style="{StaticResource PluraInnerStyle}"
+                                                BorderBrush="{StaticResource PluraBorderAccent}"
+                                                Padding="16,13">
+                                            <StackPanel Spacing="6">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Border Width="6" Height="18" Background="#FF9146FF" CornerRadius="3" />
+                                                    <TextBlock Text="TÍTULO ACTUAL DE TWITCH"
+                                                               Style="{StaticResource StatLabel}"
+                                                               Foreground="#FFB98CFF" />
+                                                </StackPanel>
+                                                <TextBlock x:Name="ChannelTitleText"
+                                                           Text="Esperando el título de Twitch…"
+                                                           FontSize="23"
+                                                           FontWeight="Bold"
+                                                           Foreground="{StaticResource PluraText}"
+                                                           TextWrapping="Wrap"
+                                                           MaxLines="2" />
+                                                <TextBlock x:Name="TitleSourceText"
+                                                           Text="Se copia automáticamente de Twitch y cambia solo cuando tú lo cambias allí."
+                                                           Style="{StaticResource HintText}"
+                                                           FontSize="12"
+                                                           Opacity="0.75" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <TextBlock x:Name="RelayDetailText"
+                                                   Text="Escribe tu canal de Twitch y activa al menos un destino."
+                                                   Style="{StaticResource HintText}" />
+
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Grid.Column="0" Style="{StaticResource PluraInnerStyle}">
+                                                <StackPanel Spacing="5">
+                                                    <TextBlock Text="REANUDA AUTOMÁTICAMENTE"
+                                                               Style="{StaticResource StatLabel}"
+                                                               Foreground="{StaticResource PluraSuccess}" />
+                                                    <TextBlock Style="{StaticResource HintText}"
+                                                               FontSize="12"
+                                                               Text="Si la Xbox cierra Plura o se corta el directo, vuelve a conectarse sola cuando Twitch esté en vivo." />
                                                 </StackPanel>
                                             </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
 
-                        <ItemsControl ItemsSource="{Binding Platforms}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Style="{StaticResource PlatformCardStyle}"
-                                            BorderBrush="{Binding BrandBrush}"
-                                            BorderThickness="{Binding AccentThickness}">
-                                        <StackPanel Spacing="12">
+                                            <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                                                <TextBlock x:Name="BackendStatusText"
+                                                           Text="Motor listo"
+                                                           FontSize="13"
+                                                           FontWeight="Bold"
+                                                           Foreground="{StaticResource PluraSuccess}" />
+                                                <Button x:Name="TestBackendButton"
+                                                        Content="Comprobar motor"
+                                                        Style="{StaticResource PluraSmallButton}"
+                                                        Click="TestBackend_Click" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
 
-                                            <!-- Fila superior -->
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
+                                <!-- Origen Twitch -->
+                                <Border x:Name="ConsoleCard" Style="{StaticResource PluraSurfaceStyle}" Padding="20,18">
+                                    <StackPanel Spacing="12">
+                                        <Grid>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="02 · ORIGEN"
+                                                           Style="{StaticResource StatLabel}"
+                                                           Foreground="#FFB98CFF" />
+                                                <TextBlock Text="Canal de Twitch"
+                                                           Style="{StaticResource SectionTitle}" />
+                                            </StackPanel>
+                                            <Border Style="{StaticResource PluraAccentPillStyle}"
+                                                    HorizontalAlignment="Right"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="EMITE DESDE XBOX"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           CharacterSpacing="0"
+                                                           Foreground="{StaticResource PluraText}" />
+                                            </Border>
+                                        </Grid>
 
-                                                <Border Grid.Column="0"
-                                                        Width="46" Height="46"
-                                                        CornerRadius="12"
-                                                        Background="{Binding BrandBrush}"
-                                                        VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding ShortName}"
-                                                               FontSize="16"
-                                                               FontWeight="Black"
-                                                               Foreground="{Binding BadgeInkBrush}"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center" />
-                                                </Border>
+                                        <TextBlock Style="{StaticResource HintText}"
+                                                   FontSize="13"
+                                                   Text="La Xbox transmite a Twitch con su función nativa. Plura lee ese directo y lo reparte a los destinos activos." />
 
-                                                <StackPanel Grid.Column="1" Margin="13,0,0,0" VerticalAlignment="Center" Spacing="5">
-                                                    <TextBlock Text="{Binding Name}"
-                                                               FontSize="18"
-                                                               FontWeight="Bold"
-                                                               Foreground="{StaticResource PluraText}" />
-                                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <Border Background="{Binding StatusBackground}"
-                                                                CornerRadius="6"
-                                                                Padding="8,2">
-                                                            <TextBlock Text="{Binding StatusText}"
-                                                                       FontSize="10"
-                                                                       FontWeight="Bold"
-                                                                       CharacterSpacing="80"
-                                                                       Foreground="{Binding StatusForeground}" />
-                                                        </Border>
-                                                        <Border Background="#33E60023"
-                                                                BorderBrush="{StaticResource PluraBorderRed}"
-                                                                BorderThickness="1"
-                                                                CornerRadius="6"
-                                                                Padding="8,2"
-                                                                Visibility="{Binding OriginVisibility}">
-                                                            <TextBlock Text="ORIGEN · EMITE DESDE XBOX"
-                                                                       FontSize="10"
-                                                                       FontWeight="Bold"
-                                                                       CharacterSpacing="60"
-                                                                       Foreground="{StaticResource PluraText}" />
-                                                        </Border>
-                                                    </StackPanel>
-                                                </StackPanel>
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
 
-                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                                    <ToggleSwitch IsOn="{Binding Enabled, Mode=TwoWay}"
-                                                                  IsEnabled="{Binding ToggleEnabled}"
-                                                                  Visibility="{Binding ToggleVisibility}"
-                                                                  Style="{StaticResource PluraToggle}"
-                                                                  Toggled="PlatformToggle_Toggled" />
-                                                </StackPanel>
+                                            <Grid x:Name="ChannelAvatarBorder"
+                                                  Grid.Column="0"
+                                                  Width="54"
+                                                  Height="54"
+                                                  VerticalAlignment="Bottom">
+                                                <Border x:Name="ChannelAvatarImage"
+                                                        CornerRadius="27"
+                                                        Background="#FF9146FF" />
+                                                <TextBlock x:Name="ChannelAvatarFallback"
+                                                           Text="T"
+                                                           FontSize="22"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#FFFFFFFF"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" />
                                             </Grid>
 
-                                            <!-- Configuración por plataforma -->
-                                            <StackPanel Visibility="{Binding SettingsVisibility}" Spacing="12">
-
-                                                <!-- Stream Key del destino -->
-                                                <Grid ColumnSpacing="12">
+                                            <StackPanel Grid.Column="1" Spacing="8">
+                                                <TextBlock Text="CANAL O ENLACE" Style="{StaticResource FieldLabel}" />
+                                                <Grid ColumnSpacing="8">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
-
-                                                    <StackPanel Grid.Column="0" Spacing="6">
-                                                        <TextBlock Text="STREAM KEY" Style="{StaticResource FieldLabel}" />
-                                                        <PasswordBox Style="{StaticResource PluraPasswordBox}"
-                                                                     PasswordRevealMode="Peek"
-                                                                     Loaded="StreamKeyBox_Loaded"
-                                                                     PasswordChanged="StreamKeyBox_PasswordChanged" />
-                                                    </StackPanel>
-
-                                                    <Button Grid.Column="1"
+                                                    <TextBox x:Name="TwitchChannelBox"
+                                                             Grid.Column="0"
+                                                             Style="{StaticResource PluraTextBox}"
+                                                             PlaceholderText="tu_canal o twitch.tv/tu_canal"
+                                                             TextChanged="TwitchChannelBox_TextChanged" />
+                                                    <Button x:Name="PasteChannelButton"
+                                                            Grid.Column="1"
                                                             Content="Pegar"
                                                             Style="{StaticResource PluraSecondaryButton}"
-                                                            VerticalAlignment="Bottom"
-                                                            Click="PasteStreamKey_Click" />
+                                                            Click="PasteTwitchChannel_Click" />
+                                                    <Button x:Name="CheckChannelButton"
+                                                            Grid.Column="2"
+                                                            Content="Comprobar"
+                                                            Style="{StaticResource PluraSecondaryButton}"
+                                                            Click="CheckChannel_Click" />
                                                 </Grid>
-
-                                                <Border Background="#FF0A0A0C"
-                                                        BorderBrush="{StaticResource PluraBorder}"
-                                                        BorderThickness="1"
-                                                        CornerRadius="8"
-                                                        Padding="12,8">
-                                                    <StackPanel Spacing="4">
-                                                        <TextBlock Text="{Binding StreamKeyHint}"
-                                                                   Style="{StaticResource HintText}" />
-                                                        <StackPanel Spacing="1">
-                                                            <TextBlock Text="SERVIDOR AUTOMÁTICO"
-                                                                       Style="{StaticResource HintText}"
-                                                                       FontSize="10"
-                                                                       CharacterSpacing="60"
-                                                                       Opacity="0.7" />
-                                                            <TextBlock Text="{Binding ServerUrl}"
-                                                                       Style="{StaticResource HintText}"
-                                                                       FontSize="11"
-                                                                       TextWrapping="Wrap"
-                                                                       Opacity="0.7" />
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
+                                                <TextBlock Style="{StaticResource HintText}"
+                                                           FontSize="11"
+                                                           Text="Se guarda automáticamente en esta consola en cuanto lo escribes." />
                                             </StackPanel>
+                                        </Grid>
 
-                                            <!-- Stats en vivo -->
-                                            <Grid Visibility="{Binding LiveVisibility}" ColumnSpacing="10">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PluraInnerStyle}" Padding="14,10">
+                                            <TextBlock x:Name="ChannelStatusText"
+                                                       Text="Escribe tu canal cuando quieras; se guarda automáticamente."
+                                                       FontSize="14"
+                                                       FontWeight="Bold"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{StaticResource PluraText}" />
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
 
-                                                <Border Grid.Column="0" Background="#FF0A0A0C" BorderBrush="{StaticResource PluraBorder}" BorderThickness="1" CornerRadius="8" Padding="12,8">
-                                                    <StackPanel>
-                                                        <TextBlock Text="BITRATE" Style="{StaticResource StatLabel}" />
-                                                        <TextBlock Text="{Binding BitrateText}" Style="{StaticResource StatValue}" />
-                                                    </StackPanel>
-                                                </Border>
+                                <!-- Guía compacta -->
+                                <Border Style="{StaticResource PluraSurfaceStyle}" Padding="20,18">
+                                    <StackPanel Spacing="12">
+                                        <TextBlock Text="03 · ARRANQUE RÁPIDO"
+                                                   Style="{StaticResource StatLabel}"
+                                                   Foreground="{StaticResource PluraAccent}" />
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Style="{StaticResource PluraStepStyle}">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="1 · EMITE EN TWITCH"
+                                                               Style="{StaticResource StatLabel}"
+                                                               Foreground="#FFB98CFF" />
+                                                    <TextBlock Style="{StaticResource HintText}"
+                                                               FontSize="11"
+                                                               Text="Guía → Capturar y compartir → Emisión en directo." />
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Grid.Column="1" Style="{StaticResource PluraStepStyle}">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="2 · ACTIVA DESTINOS"
+                                                               Style="{StaticResource StatLabel}"
+                                                               Foreground="#FFB98CFF" />
+                                                    <TextBlock Style="{StaticResource HintText}"
+                                                               FontSize="11"
+                                                               Text="Pega la clave de cada red en su mosaico." />
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Grid.Column="2" Style="{StaticResource PluraStepStyle}">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="3 · PULSA INICIAR"
+                                                               Style="{StaticResource StatLabel}"
+                                                               Foreground="#FFB98CFF" />
+                                                    <TextBlock Style="{StaticResource HintText}"
+                                                               FontSize="11"
+                                                               Text="El indicador confirma que la señal está fluyendo." />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
 
-                                                <Border Grid.Column="1" Background="#FF0A0A0C" BorderBrush="{StaticResource PluraBorder}" BorderThickness="1" CornerRadius="8" Padding="12,8">
-                                                    <StackPanel>
-                                                        <TextBlock Text="FPS" Style="{StaticResource StatLabel}" />
-                                                        <TextBlock Text="{Binding FpsText}" Style="{StaticResource StatValue}" />
-                                                    </StackPanel>
-                                                </Border>
+                            <!-- COLUMNA DERECHA: DESTINOS -->
+                            <Border Grid.Column="1" Style="{StaticResource PluraSurfaceStyle}" Padding="20,18">
+                                <StackPanel Spacing="12">
 
-                                                <Border Grid.Column="2" Background="#FF0A0A0C" BorderBrush="{StaticResource PluraBorder}" BorderThickness="1" CornerRadius="8" Padding="12,8">
-                                                    <StackPanel>
-                                                        <TextBlock Text="DURACIÓN" Style="{StaticResource StatLabel}" />
-                                                        <TextBlock Text="{Binding DurationText}" Style="{StaticResource StatValue}" />
-                                                    </StackPanel>
-                                                </Border>
-
-                                                <Border Grid.Column="3" Background="#FF0A0A0C" BorderBrush="{StaticResource PluraBorder}" BorderThickness="1" CornerRadius="8" Padding="12,8">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource StatLabel}" />
-                                                        <TextBlock Text="EN VIVO" Style="{StaticResource StatValue}" Foreground="{StaticResource PluraRed}" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </Grid>
-
-                                            <!-- Acciones -->
-                                            <StackPanel Orientation="Horizontal"
-                                                        HorizontalAlignment="Right"
-                                                        Spacing="10"
-                                                        Visibility="{Binding ActionsVisibility}">
-                                                <Button Content="▶  Iniciar"
-                                                        Style="{StaticResource PluraPrimaryButton}"
-                                                        Padding="14,7"
-                                                        MinHeight="38"
-                                                        FontSize="13"
-                                                        IsEnabled="{Binding CanStart}"
-                                                        Click="PlatformStart_Click" />
-                                                <Button Content="■  Detener"
-                                                        Style="{StaticResource PluraSmallDangerButton}"
-                                                        IsEnabled="{Binding CanStop}"
-                                                        Click="PlatformStop_Click" />
+                                    <Grid>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="04 · DESTINOS"
+                                                       Style="{StaticResource StatLabel}"
+                                                       Foreground="{StaticResource PluraAccent}" />
+                                            <TextBlock Text="A dónde llega tu directo"
+                                                       Style="{StaticResource SectionTitle}" />
+                                        </StackPanel>
+                                        <Border Style="{StaticResource PluraPillStyle}"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                Padding="13,8">
+                                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                                <StackPanel Spacing="1">
+                                                    <TextBlock Text="TRANSMITIR EN TODAS"
+                                                               FontSize="13"
+                                                               FontWeight="Bold"
+                                                               Foreground="{StaticResource PluraText}" />
+                                                    <TextBlock Text="Activa o quita todas a la vez"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource PluraMuted}" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="MasterToggle"
+                                                              Style="{StaticResource PluraToggle}"
+                                                              Toggled="MasterToggle_Toggled" />
                                             </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <Border Style="{StaticResource PluraInnerStyle}"
+                                            BorderBrush="{StaticResource PluraBorderAccent}"
+                                            Padding="13,10">
+                                        <StackPanel Spacing="7">
+                                            <TextBlock Text="VAS A TRANSMITIR A"
+                                                       Style="{StaticResource StatLabel}"
+                                                       Foreground="{StaticResource PluraMuted}" />
+                                            <TextBlock x:Name="SelectionSummary"
+                                                       Text="Ninguna plataforma seleccionada. Activa al menos un destino."
+                                                       FontSize="15"
+                                                       FontWeight="Bold"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{StaticResource PluraText}" />
+                                            <ItemsControl ItemsSource="{Binding SelectionChips}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="7" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="{Binding Background}"
+                                                                BorderBrush="{Binding Border}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="11"
+                                                                Padding="9,5"
+                                                                Opacity="{Binding Opacity}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                                <Ellipse Width="8" Height="8"
+                                                                         Fill="{Binding Accent}"
+                                                                         VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding Name}"
+                                                                           FontSize="12"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{Binding Foreground}" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </StackPanel>
                                     </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
 
-                <!-- Consola Xbox (legado, oculto: la app es solo consola) -->
-                <Border x:Name="XboxCard" Style="{StaticResource PluraCardStyle}" Visibility="Collapsed">
-                    <StackPanel Spacing="14">
-                        <TextBlock Text="Consola Xbox" Style="{StaticResource SectionTitle}" />
+                                    <!-- Tres destinos en una sola fila: Kick, YouTube y Facebook Gaming. -->
+                                    <ItemsControl ItemsSource="{Binding Destinations}"
+                                                  VerticalAlignment="Stretch">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapGrid Orientation="Horizontal"
+                                                          MaximumRowsOrColumns="3"
+                                                          ItemWidth="390"
+                                                          ItemHeight="500"
+                                                          VerticalAlignment="Stretch" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource PlatformCardStyle}"
+                                                        BorderBrush="{Binding BrandBrush}"
+                                                        BorderThickness="{Binding AccentThickness}">
+                                                    <Grid RowSpacing="10">
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="*" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
 
-                        <Grid ColumnSpacing="14">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="2*" />
-                            </Grid.ColumnDefinitions>
+                                                        <Grid Grid.Row="0">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="MODELO DE CONSOLA" Style="{StaticResource FieldLabel}" />
-                                <ComboBox x:Name="XboxModelBox"
-                                          Style="{StaticResource PluraComboBox}"
-                                          SelectionChanged="XboxModelBox_SelectionChanged">
+                                                            <Border Grid.Column="0"
+                                                                    Width="44" Height="44"
+                                                                    CornerRadius="11"
+                                                                    Background="{Binding BrandBrush}"
+                                                                    VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding ShortName}"
+                                                                           FontSize="15"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{Binding BadgeInkBrush}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                            </Border>
+
+                                                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Spacing="5">
+                                                                <TextBlock Text="{Binding Name}"
+                                                                           FontSize="18"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource PluraText}" />
+                                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                    <Border Background="{Binding StatusBackground}"
+                                                                            CornerRadius="5"
+                                                                            Padding="7,3">
+                                                                        <TextBlock Text="{Binding StatusText}"
+                                                                                   FontSize="11"
+                                                                                   FontWeight="SemiBold"
+                                                                                   CharacterSpacing="0"
+                                                                                   Foreground="{Binding StatusForeground}" />
+                                                                    </Border>
+                                                                </StackPanel>
+                                                            </StackPanel>
+
+                                                            <ToggleSwitch Grid.Column="2"
+                                                                          IsOn="{Binding Enabled, Mode=TwoWay}"
+                                                                          IsEnabled="{Binding ToggleEnabled}"
+                                                                          Visibility="{Binding ToggleVisibility}"
+                                                                          Style="{StaticResource PluraToggle}"
+                                                                          Toggled="PlatformToggle_Toggled" />
+                                                        </Grid>
+
+                                                        <StackPanel Grid.Row="1" Visibility="{Binding SettingsVisibility}" Spacing="8">
+                                                            <Grid ColumnSpacing="9">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel Grid.Column="0" Spacing="4">
+                                                                    <TextBlock Text="{Binding StreamKeyFieldLabel}"
+                                                                               Style="{StaticResource FieldLabel}" />
+                                                                    <PasswordBox Style="{StaticResource PluraPasswordBox}"
+                                                                                 PasswordRevealMode="Peek"
+                                                                                 Loaded="StreamKeyBox_Loaded"
+                                                                                 PasswordChanged="StreamKeyBox_PasswordChanged" />
+                                                                </StackPanel>
+                                                                <Button Grid.Column="1"
+                                                                        Content="Pegar"
+                                                                        Style="{StaticResource PluraSecondaryButton}"
+                                                                        MinHeight="44"
+                                                                        VerticalAlignment="Bottom"
+                                                                        Click="PasteStreamKey_Click" />
+                                                            </Grid>
+
+                                                            <Border Style="{StaticResource PluraMetricStyle}" Padding="10,8">
+                                                                <StackPanel Spacing="3">
+                                                                    <TextBlock Text="{Binding StreamKeyHint}"
+                                                                               Style="{StaticResource HintText}"
+                                                                               FontSize="11"
+                                                                               MaxLines="2" />
+                                                                    <TextBlock Text="{Binding ServerUrl}"
+                                                                               Style="{StaticResource HintText}"
+                                                                               FontSize="10"
+                                                                               Opacity="0.65"
+                                                                               MaxLines="1"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </Border>
+
+                                                        </StackPanel>
+
+                                                        <Border Grid.Row="2"
+                                                                Height="1"
+                                                                Margin="0,0,0,1"
+                                                                VerticalAlignment="Bottom"
+                                                                Background="{StaticResource PluraBorder}" />
+
+                                                        <Grid Grid.Row="3" Visibility="{Binding LiveVisibility}" ColumnSpacing="7">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <Border Grid.Column="0" Style="{StaticResource PluraMetricStyle}" Padding="8,6">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="KBPS" Style="{StaticResource StatLabel}" FontSize="10" />
+                                                                        <TextBlock Text="{Binding BitrateText}" Style="{StaticResource StatValue}" FontSize="15" />
+                                                                    </StackPanel>
+                                                                </Border>
+                                                                <Border Grid.Column="1" Style="{StaticResource PluraMetricStyle}" Padding="8,6">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="FPS" Style="{StaticResource StatLabel}" FontSize="10" />
+                                                                        <TextBlock Text="{Binding FpsText}" Style="{StaticResource StatValue}" FontSize="15" />
+                                                                    </StackPanel>
+                                                                </Border>
+                                                                <Border Grid.Column="2" Style="{StaticResource PluraMetricStyle}" Padding="8,6">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="TIEMPO" Style="{StaticResource StatLabel}" FontSize="10" />
+                                                                        <TextBlock Text="{Binding DurationText}" Style="{StaticResource StatValue}" FontSize="15" />
+                                                                    </StackPanel>
+                                                                </Border>
+                                                        </Grid>
+
+                                                        <StackPanel Grid.Row="4" Orientation="Horizontal"
+                                                            HorizontalAlignment="Right"
+                                                            Spacing="8"
+                                                            Visibility="{Binding ActionsVisibility}">
+                                                            <Button Content="▶ Iniciar"
+                                                                Style="{StaticResource PluraSmallButton}"
+                                                                IsEnabled="{Binding CanStart}"
+                                                                Click="PlatformStart_Click" />
+                                                            <Button Content="■ Detener"
+                                                                Style="{StaticResource PluraSmallDangerButton}"
+                                                                IsEnabled="{Binding CanStop}"
+                                                                Click="PlatformStop_Click" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- LEGADO OCULTO: se conservan los controles y eventos antiguos,
+                             pero no se muestran en la interfaz de Xbox. -->
+                        <StackPanel Visibility="Collapsed">
+                            <Border x:Name="ObsCard" Style="{StaticResource PluraSurfaceStyle}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Conexión con OBS" Style="{StaticResource SectionTitle}" />
+                                    <Border x:Name="ObsStatusPill" Style="{StaticResource PluraPillStyle}" HorizontalAlignment="Left">
+                                        <TextBlock x:Name="ObsStatusText" Text="Sin conectar" FontSize="13" />
+                                    </Border>
+                                    <TextBox x:Name="ObsHostBox" Style="{StaticResource PluraTextBox}" TextChanged="ObsHostBox_TextChanged" />
+                                    <TextBox x:Name="ObsPortBox" Style="{StaticResource PluraTextBox}" TextChanged="ObsPortBox_TextChanged" />
+                                    <PasswordBox x:Name="ObsPasswordBox" Style="{StaticResource PluraPasswordBox}" PasswordChanged="ObsPasswordBox_PasswordChanged" />
+                                    <Button x:Name="TestObsButton" Content="Probar conexión" Style="{StaticResource PluraSecondaryButton}" Click="TestObsButton_Click" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border x:Name="XboxCard" Style="{StaticResource PluraSurfaceStyle}">
+                                <ComboBox x:Name="XboxModelBox" Style="{StaticResource PluraComboBox}" SelectionChanged="XboxModelBox_SelectionChanged">
                                     <ComboBoxItem Content="Xbox Series X" />
                                     <ComboBoxItem Content="Xbox Series S" />
                                     <ComboBoxItem Content="Xbox One X" />
                                     <ComboBoxItem Content="Xbox One" />
                                 </ComboBox>
-                            </StackPanel>
+                            </Border>
 
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="ENTRADA DE VIDEO" Style="{StaticResource FieldLabel}" />
-                                <TextBlock Text="HDMI → tarjeta de captura → OBS"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource PluraText}" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="CAPTURA" Style="{StaticResource FieldLabel}" />
-                                <TextBlock Text="OBS en tu PC"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource PluraText}" />
-                            </StackPanel>
-                        </Grid>
-
-                        <TextBlock Style="{StaticResource HintText}"
-                                   Text="Xbox no permite que apps de terceros capturen el juego directamente. Plura controla OBS por red, y OBS recibe la señal HDMI de la consola y la envía a todas las plataformas." />
+                            <Border x:Name="StreamCard" Style="{StaticResource PluraSurfaceStyle}">
+                                <StackPanel>
+                                    <ComboBox x:Name="ResolutionBox" Style="{StaticResource PluraComboBox}" SelectionChanged="ResolutionBox_SelectionChanged">
+                                        <ComboBoxItem Content="720p" />
+                                        <ComboBoxItem Content="1080p" />
+                                    </ComboBox>
+                                    <ComboBox x:Name="FpsBox" Style="{StaticResource PluraComboBox}" SelectionChanged="FpsBox_SelectionChanged">
+                                        <ComboBoxItem Content="30" />
+                                        <ComboBoxItem Content="60" />
+                                    </ComboBox>
+                                    <TextBox x:Name="BitrateBox" Style="{StaticResource PluraTextBox}" TextChanged="BitrateBox_TextChanged" />
+                                    <ComboBox x:Name="PresetBox" Style="{StaticResource PluraComboBox}" SelectionChanged="PresetBox_SelectionChanged">
+                                        <ComboBoxItem Content="veryfast" />
+                                        <ComboBoxItem Content="fast" />
+                                        <ComboBoxItem Content="medium" />
+                                        <ComboBoxItem Content="slow" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
+                </ScrollViewer>
+
+                <!-- ================= PIE ================= -->
+                <Border Grid.Row="2"
+                        Background="#FF070709"
+                        BorderBrush="{StaticResource PluraBorderAccent}"
+                        BorderThickness="0,1,0,0"
+                        Padding="40,0,40,0">
+                    <Grid>
+                        <TextBlock x:Name="FooterStatus"
+                                   Text="Listo."
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource PluraMuted}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="PLURA · TODO DESDE LA XBOX"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   CharacterSpacing="0"
+                                   Foreground="{StaticResource PluraMuted}" />
+                    </Grid>
                 </Border>
-
-                <!-- Ajustes de stream (legado, oculto: la app es solo consola) -->
-                <Border x:Name="StreamCard" Style="{StaticResource PluraCardStyle}" Visibility="Collapsed">
-                    <StackPanel Spacing="14">
-                        <TextBlock Text="Configuración de stream" Style="{StaticResource SectionTitle}" />
-
-                        <Grid ColumnSpacing="14">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="RESOLUCIÓN" Style="{StaticResource FieldLabel}" />
-                                <ComboBox x:Name="ResolutionBox"
-                                          Style="{StaticResource PluraComboBox}"
-                                          SelectionChanged="ResolutionBox_SelectionChanged">
-                                    <ComboBoxItem Content="720p" />
-                                    <ComboBoxItem Content="1080p" />
-                                </ComboBox>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="FPS" Style="{StaticResource FieldLabel}" />
-                                <ComboBox x:Name="FpsBox"
-                                          Style="{StaticResource PluraComboBox}"
-                                          SelectionChanged="FpsBox_SelectionChanged">
-                                    <ComboBoxItem Content="30" />
-                                    <ComboBoxItem Content="60" />
-                                </ComboBox>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="BITRATE (KBPS)" Style="{StaticResource FieldLabel}" />
-                                <TextBox x:Name="BitrateBox"
-                                         Style="{StaticResource PluraTextBox}"
-                                         InputScope="Number"
-                                         TextChanged="BitrateBox_TextChanged" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="3">
-                                <TextBlock Text="PRESET x264" Style="{StaticResource FieldLabel}" />
-                                <ComboBox x:Name="PresetBox"
-                                          Style="{StaticResource PluraComboBox}"
-                                          SelectionChanged="PresetBox_SelectionChanged">
-                                    <ComboBoxItem Content="veryfast" />
-                                    <ComboBoxItem Content="fast" />
-                                    <ComboBoxItem Content="medium" />
-                                    <ComboBoxItem Content="slow" />
-                                </ComboBox>
-                            </StackPanel>
-                        </Grid>
-
-                        <TextBlock Style="{StaticResource HintText}"
-                                   Text="Estos valores son de referencia. El encoder real (resolución, FPS y bitrate) se configura en OBS Studio." />
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
-
-        <!-- ================= PIE ================= -->
-        <Border Grid.Row="2"
-                Background="#FF0B0B0D"
-                BorderBrush="{StaticResource PluraBorderRed}"
-                BorderThickness="0,1,0,0"
-                Padding="48,10,48,10">
-            <Grid>
-                <TextBlock x:Name="FooterStatus"
-                           Text="Listo."
-                           FontSize="13"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource PluraMuted}"
-                           VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
-                <TextBlock Text="PLURA · Multistream para Xbox"
-                           HorizontalAlignment="Right"
-                           VerticalAlignment="Center"
-                           FontSize="12"
-                           FontWeight="Bold"
-                           CharacterSpacing="60"
-                           Foreground="{StaticResource PluraMuted}" />
             </Grid>
-        </Border>
+        </Viewbox>
     </Grid>
 </Page>

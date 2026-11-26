@@ -478,23 +478,50 @@ namespace Plura.Models
             get { return Visibility.Collapsed; }
         }
 
-        /// <summary>Pista concreta de dónde sacar la Stream Key de cada red.</summary>
+        /// <summary>
+        /// Nombre que cada plataforma usa en español para su clave de ingesta.
+        /// Kick la llama "clave de retransmisión"; YouTube, Twitch y Facebook,
+        /// "clave de transmisión".
+        /// </summary>
+        public string StreamKeyDisplayName
+        {
+            get
+            {
+                return string.Equals(Id, "kick", StringComparison.OrdinalIgnoreCase)
+                    ? "clave de retransmisión"
+                    : "clave de transmisión";
+            }
+        }
+
+        public string StreamKeyFieldLabel
+        {
+            get { return "1 · " + UpperFirst(StreamKeyDisplayName); }
+        }
+
+        /// <summary>Pista concreta de dónde sacar la clave de cada red.</summary>
         public string StreamKeyHint
         {
             get
             {
+                var name = UpperFirst(StreamKeyDisplayName);
                 switch ((Id ?? string.Empty).ToLowerInvariant())
                 {
                     case "youtube":
-                        return "Pega solo la clave · YouTube Studio → Transmitir → Clave de transmisión.";
+                        return "Se guarda sola · YouTube Studio → Transmitir → " + name + ".";
                     case "kick":
-                        return "Pega solo la clave · Kick → Configuración → Stream Key.";
+                        return "Se guarda sola · Kick → Configuración → " + name + ".";
                     case "facebook":
-                        return "Pega solo la clave · Facebook Live Producer → Clave de transmisión.";
+                        return "Se guarda sola · Facebook Live Producer → " + name + ".";
                     default:
-                        return "Pega solo la clave desde el panel de la plataforma.";
+                        return "Se guarda sola · " + name + " desde el panel de la plataforma.";
                 }
             }
+        }
+
+        private static string UpperFirst(string value)
+        {
+            if (string.IsNullOrEmpty(value)) { return value; }
+            return char.ToUpperInvariant(value[0]) + value.Substring(1);
         }
 
         // --------------------------------------------------- modo consola
@@ -558,9 +585,10 @@ namespace Plura.Models
             Raise(nameof(StatusForeground));
         }
 
+        /// <summary>Borde de la tarjeta: franja gruesa del color de marca cuando está activa.</summary>
         public Thickness AccentThickness
         {
-            get { return _enabled ? new Thickness(4, 0, 0, 0) : new Thickness(0); }
+            get { return _enabled ? new Thickness(4, 1, 1, 1) : new Thickness(0, 1, 1, 1); }
         }
 
         public void ResetStats()

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Storage;
 using Windows.UI.Xaml;
@@ -15,6 +16,10 @@ namespace Plura
         {
             this.InitializeComponent();
             this.UnhandledException += App_UnhandledException;
+            this.Suspending += App_Suspending;
+            this.Resuming += App_Resuming;
+            this.EnteredBackground += App_EnteredBackground;
+            this.LeavingBackground += App_LeavingBackground;
             Log("App started");
         }
 
@@ -41,6 +46,69 @@ namespace Plura
             {
                 Log("OnLaunched EXCEPTION: " + Describe(ex));
                 throw;
+            }
+        }
+
+        private void App_Suspending(object sender, SuspendingEventArgs e)
+        {
+            var deferral = e.SuspendingOperation.GetDeferral();
+            Log("App suspending");
+            try
+            {
+                var frame = Window.Current.Content as Frame;
+                var page = frame?.Content as MainPage;
+                page?.PrepareForSuspension();
+            }
+            catch (Exception ex)
+            {
+                Log("Prepare for suspension failed: " + Describe(ex));
+            }
+            try { deferral.Complete(); } catch { }
+        }
+
+        private void App_Resuming(object sender, object e)
+        {
+            Log("App resuming");
+            ResumeRelayAfterBackground();
+        }
+
+        private void App_LeavingBackground(object sender, LeavingBackgroundEventArgs e)
+        {
+            Log("App leaving background");
+            ResumeRelayAfterBackground();
+        }
+
+        private void App_EnteredBackground(object sender, EnteredBackgroundEventArgs e)
+        {
+            Log("App entered background");
+            // No se pide otra sesión de ejecución aquí: liberar la actual justo
+            // al pasar a segundo plano provoca que Xbox la deniegue. Sí se
+            // garantiza que el audio silencioso siga sonando, que es lo que
+            // mantiene vivo el proceso en Xbox.
+            try
+            {
+                var frame = Window.Current.Content as Frame;
+                var page = frame?.Content as MainPage;
+                page?.KeepAliveInBackground();
+            }
+            catch (Exception ex)
+            {
+                Log("Keep alive on background failed: " + Describe(ex));
+            }
+        }
+
+        private static void ResumeRelayAfterBackground()
+        {
+            try
+            {
+                var frame = Window.Current.Content as Frame;
+                var page = frame?.Content as MainPage;
+                if (page == null) { return; }
+                page.ResumeAfterBackground();
+            }
+            catch (Exception ex)
+            {
+                Log("Resume relay failed: " + Describe(ex));
             }
         }
 

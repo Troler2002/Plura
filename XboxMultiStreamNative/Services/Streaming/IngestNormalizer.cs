@@ -74,6 +74,8 @@ namespace Plura.Services.Streaming
             {
                 case "twitch": return "rtmp://live.twitch.tv/app/";
                 case "youtube": return "rtmp://a.rtmp.youtube.com/live2/";
+                // Kick (Amazon IVS) exige RTMPS: por RTMP plano conecta, pero
+                // cierra la sesión cuando recibe publish, aunque la key sea válida.
                 case "kick": return "rtmps://fa723fc1b171.global-contribute.live-video.net:443/app/";
                 case "facebook": return "rtmps://live-api-s.facebook.com:443/rtmp/";
                 default: return string.Empty;

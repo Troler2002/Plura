@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Windows.Foundation.Collections;
 using Windows.Storage;
 
@@ -26,10 +27,19 @@ namespace Plura.Services
         public bool Enabled { get; set; }
         public string StreamKey { get; set; } = string.Empty;
         public string ServerUrl { get; set; } = string.Empty;
+
         public string TargetName { get; set; } = string.Empty;
         public string Mode { get; set; } = "manual";
         public bool Linked { get; set; }
         public string AccountLabel { get; set; } = string.Empty;
+    }
+
+    /// <summary>Intención de emisión que se conserva si Xbox suspende la app.</summary>
+    public sealed class RelaySessionSettings
+    {
+        public bool Active { get; set; }
+        public string Channel { get; set; } = string.Empty;
+        public List<string> Targets { get; } = new List<string>();
     }
 
     /// <summary>
@@ -51,6 +61,12 @@ namespace Plura.Services
         private const string PrimaryPlatformKey = "plura.primary.platform";
         private const string ConsoleModeKey = "plura.console.mode";
         private const string TwitchChannelKey = "plura.twitch.channel";
+        private const string RelayActiveKey = "plura.relay.active";
+        private const string RelayChannelKey = "plura.relay.channel";
+        private const string RelayTargetsKey = "plura.relay.targets";
+        private const string RelayUserStoppedKey = "plura.relay.userstopped";
+        private const string AppBuildKey = "plura.app.build";
+        private const string CurrentAppBuild = "1.0.0.80";
 
         private static readonly Dictionary<string, object> Fallback =
             new Dictionary<string, object>(StringComparer.Ordinal);
@@ -160,6 +176,82 @@ namespace Plura.Services
         public void SaveTwitchChannel(string login)
         {
             Write(TwitchChannelKey, (login ?? string.Empty).Trim().ToLowerInvariant());
+        }
+
+        /// <summary>
+        /// Guarda la intención de emitir (canal y destinos) para que la app pueda
+        /// reanudar el relay cuando Xbox la suspende o la reinicia.
+        /// </summary>
+        public void SaveRelaySession(string channel, IEnumerable<string> targets)
+        {
+            var login = (channel ?? string.Empty).Trim().ToLowerInvariant();
+            var ids = targets == null
+                ? new List<string>()
+                : targets.Where(t => !string.IsNullOrWhiteSpace(t))
+                         .Select(t => t.Trim().ToLowerInvariant())
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .ToList();
+
+            Write(RelayActiveKey, !string.IsNullOrWhiteSpace(login) && ids.Count > 0);
+            Write(RelayChannelKey, login);
+            Write(RelayTargetsKey, string.Join(",", ids));
+        }
+
+        public RelaySessionSettings LoadRelaySession()
+        {
+            var session = new RelaySessionSettings
+            {
+                Active = ReadBool(RelayActiveKey, false),
+                Channel = ReadString(RelayChannelKey, string.Empty).Trim().ToLowerInvariant()
+            };
+
+            var raw = ReadString(RelayTargetsKey, string.Empty);
+            foreach (var id in raw.Split(','))
+            {
+                var value = id.Trim().ToLowerInvariant();
+                if (value.Length > 0) { session.Targets.Add(value); }
+            }
+
+            if (!session.Active || session.Channel.Length == 0 || session.Targets.Count == 0)
+            {
+                return new RelaySessionSettings();
+            }
+            return session;
+        }
+
+        public void ClearRelaySession()
+        {
+            Write(RelayActiveKey, false);
+            Write(RelayChannelKey, string.Empty);
+            Write(RelayTargetsKey, string.Empty);
+        }
+
+        /// <summary>
+        /// true cuando el usuario pulsó Detener: evita que el arranque automático
+        /// vuelva a encender un relay que se quiso apagar.
+        /// </summary>
+        public bool LoadRelayUserStopped()
+        {
+            return ReadBool(RelayUserStoppedKey, false);
+        }
+
+        public void SetRelayUserStopped(bool stopped)
+        {
+            Write(RelayUserStoppedKey, stopped);
+        }
+
+        /// <summary>
+        /// Después de actualizar la app se descarta el "Detener" de la versión
+        /// anterior: el objetivo es que cada nueva build vuelva a emitir sola
+        /// si Twitch está en vivo. Los canales, claves y tokens se conservan.
+        /// </summary>
+        public void ApplyBuildMigration()
+        {
+            var previous = ReadString(AppBuildKey, string.Empty);
+            if (string.Equals(previous, CurrentAppBuild, StringComparison.Ordinal)) { return; }
+
+            Write(AppBuildKey, CurrentAppBuild);
+            Write(RelayUserStoppedKey, false);
         }
 
         public PlatformSettings LoadPlatform(string id)

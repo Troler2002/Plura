@@ -24,6 +24,7 @@
     <PackageCertificateThumbprint>E3C8A19C9120E4636D5B4A6FD56C968B7FE3B81D</PackageCertificateThumbprint>
     <PackageCertificatePassword>PluraDev123</PackageCertificatePassword>
     <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
+    <RuntimeIdentifiers>win10;win10-aot;win10-arm;win10-arm-aot;win10-arm64;win10-x86;win10-x86-aot;win10-x64;win10-x64-aot</RuntimeIdentifiers>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -33,6 +34,8 @@
     <OutputPath>bin\x64\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
     <UseDotNetNativeToolchain>false</UseDotNetNativeToolchain>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebugType>pdbonly</DebugType>
@@ -40,6 +43,8 @@
     <OutputPath>bin\x64\Release\</OutputPath>
     <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
     <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <DebugSymbols>true</DebugSymbols>
@@ -48,6 +53,8 @@
     <OutputPath>bin\ARM64\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
     <UseDotNetNativeToolchain>false</UseDotNetNativeToolchain>
+    <PlatformTarget>arm64</PlatformTarget>
+    <RuntimeIdentifier>win10-arm64</RuntimeIdentifier>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <DebugType>pdbonly</DebugType>
@@ -55,6 +62,8 @@
     <OutputPath>bin\ARM64\Release\</OutputPath>
     <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
     <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
+    <PlatformTarget>arm64</PlatformTarget>
+    <RuntimeIdentifier>win10-arm64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
@@ -68,6 +77,7 @@
     <Compile Include="Models\SelectionChip.cs" />
     <Compile Include="Services\ObsClient.cs" />
     <Compile Include="Services\SettingsStore.cs" />
+    <Compile Include="Services\Streaming\ConsoleRelayClient.cs" />
     <Compile Include="Services\Streaming\CredentialResolver.cs" />
     <Compile Include="Services\Streaming\CredentialResult.cs" />
     <Compile Include="Services\Streaming\IAuthService.cs" />
@@ -83,6 +93,15 @@
     <Compile Include="Services\Streaming\StreamEndpoint.cs" />
     <Compile Include="Services\Streaming\StreamEndpointValidator.cs" />
     <Compile Include="Services\Streaming\StreamingCoordinator.cs" />
+    <Compile Include="Services\Streaming\OnDevice\OnDeviceModels.cs" />
+    <Compile Include="Services\Streaming\OnDevice\TwitchService.cs" />
+    <Compile Include="Services\Streaming\OnDevice\MpegTsDemuxer.cs" />
+    <Compile Include="Services\Streaming\OnDevice\Fmp4Demuxer.cs" />
+    <Compile Include="Services\Streaming\OnDevice\UnifiedDemuxer.cs" />
+    <Compile Include="Services\Streaming\OnDevice\RtmpProtocol.cs" />
+    <Compile Include="Services\Streaming\OnDevice\RtmpPublisher.cs" />
+    <Compile Include="Services\Streaming\OnDevice\OnDeviceRelayClient.cs" />
+    <Compile Include="Services\Streaming\OnDevice\BackgroundKeepAlive.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
 
@@ -105,6 +124,7 @@
 
   <ItemGroup>
     <Content Include="Assets\*.png" />
+    <Content Include="Assets\silence.wav" />
     <None Include="Properties\Default.rd.xml" />
   </ItemGroup>
 

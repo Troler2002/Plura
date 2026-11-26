@@ -3,10 +3,11 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap mp rescap">
+  IgnorableNamespaces="uap uap3 mp rescap">
 
-  <Identity Name="Plura.Xbox" Publisher="CN=Plura" Version="1.0.0.0" />
+  <Identity Name="Plura.OnDevice" Publisher="CN=Plura" Version="1.0.0.80" />
 
   <mp:PhoneIdentity PhoneProductId="b7a3e2c1-9d4f-4a6b-8c2e-5f1a0d3b7c94" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
@@ -29,7 +30,7 @@
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="Plura.App">
       <uap:VisualElements
         DisplayName="Plura"
-        Description="Multistream para Xbox: Twitch, YouTube, Kick y Facebook Gaming"
+        Description="Multistream en la propia Xbox, sin PC ni backend"
         BackgroundColor="#050506"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
@@ -37,7 +38,7 @@
           Wide310x150Logo="Assets\Wide310x150Logo.png"
           Square71x71Logo="Assets\SmallTile.png"
           Square310x310Logo="Assets\LargeTile.png"
-          ShortName="Plura" />
+          ShortName="PluraLocal" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#050506" />
       </uap:VisualElements>
     </Application>
@@ -46,5 +47,7 @@
   <Capabilities>
     <Capability Name="internetClient" />
     <Capability Name="privateNetworkClientServer" />
+    <uap3:Capability Name="backgroundMediaPlayback" />
+    <rescap:Capability Name="extendedExecutionUnconstrained" />
   </Capabilities>
 </Package>

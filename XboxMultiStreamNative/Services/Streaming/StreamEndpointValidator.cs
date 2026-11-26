@@ -30,12 +30,12 @@ namespace Plura.Services.Streaming
 
             if (string.IsNullOrWhiteSpace(streamKey))
             {
-                return "Falta la Stream Key.";
+                return "Falta la clave de la plataforma.";
             }
 
             if (streamKey.Trim().Length < 4)
             {
-                return "La Stream Key parece demasiado corta.";
+                return "La clave de la plataforma parece demasiado corta.";
             }
 
             return null;

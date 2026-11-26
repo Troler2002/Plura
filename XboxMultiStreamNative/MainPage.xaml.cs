@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 using Plura.Models;
 using Plura.Services;
 using Plura.Services.Streaming;
+using Plura.Services.Streaming.OnDevice;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Data.Json;
 using Windows.Storage.Streams;
 using Windows.UI;
+using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
@@ -28,8 +30,10 @@ namespace Plura
         private readonly CredentialResolver _resolver;
         private readonly ObsMultiRtmpSink _sink;
         private readonly StreamingCoordinator _coordinator;
-        private readonly ConsoleRelayClient _relay;
-        private readonly CancellationTokenSource _pageCts = new CancellationTokenSource();
+        private readonly OnDeviceRelayClient _relay;
+        private CancellationTokenSource _pageCts = new CancellationTokenSource();
+        // El relay vive más que la página: no se cancela al salir de segundo plano.
+        private CancellationTokenSource _relayCts = new CancellationTokenSource();
         private readonly DispatcherTimer _pollTimer;
         private readonly DispatcherTimer _messageTimer;
 
@@ -46,23 +50,29 @@ namespace Plura
 
         private bool _consoleMode;
         private bool _relayRunning;
+        private bool _restoringRelay;
         private int _channelTicks;
         private RelayStatus _relayStatus;
         private RelayChannelInfo _channelInfo;
+        private bool _channelChecking;
+        private string _channelCheckError = string.Empty;
         private string _channelAvatarUrl = string.Empty;
         private readonly List<Uri> _avatarFallbacks = new List<Uri>();
+        private string _lastDisplayedTitle = string.Empty;
+
+        // El relay se reanuda solo mientras exista una intención guardada. El
+        // backoff evita una tormenta de reintentos si Twitch o la clave fallan.
+        private DateTime _nextAutoStartUtc = DateTime.MinValue;
+        private int _autoStartFailures;
+        private DateTime _noMediaSinceUtc = DateTime.MinValue;
 
         // Se espera a que el usuario deje de escribir antes de consultar el
         // canal: así no se comprueban nombres a medio escribir.
         private readonly DispatcherTimer _channelTimer;
         private DateTime _channelEditAt = DateTime.MinValue;
 
-        // El canal y las Stream Keys se guardan también en el backend para que
-        // no se pierdan al reinstalar o actualizar la app en la consola.
-        private readonly DispatcherTimer _settingsTimer;
-        private bool _settingsPulled;
-        private bool _settingsPulling;
-        private bool _applyingRemoteSettings;
+        // El canal y las Stream Keys se guardan en el almacenamiento local de la
+        // consola. No se envían a ningún servidor intermedio.
 
         public MainPage()
         {
@@ -71,6 +81,7 @@ namespace Plura
                 InitializeComponent();
 
                 Platforms = new ObservableCollection<PlatformViewModel>();
+                Destinations = new ObservableCollection<PlatformViewModel>();
                 SelectionChips = new ObservableCollection<SelectionChip>();
 
                 _backend = new PluraBackendClient(_secure);
@@ -78,7 +89,7 @@ namespace Plura
                 _resolver = new CredentialResolver(_oauth);
                 _sink = new ObsMultiRtmpSink(_obs);
                 _coordinator = new StreamingCoordinator(_resolver, _sink);
-                _relay = new ConsoleRelayClient(_backend);
+                _relay = OnDeviceRelayClient.Current;
 
                 CreatePlatforms();
                 DataContext = this;
@@ -88,6 +99,9 @@ namespace Plura
 
                 _messageTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(7) };
                 _messageTimer.Tick += MessageTimer_Tick;
+
+                _channelTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+                _channelTimer.Tick += ChannelTimer_Tick;
 
                 Loaded += MainPage_Loaded;
                 Unloaded += MainPage_Unloaded;
@@ -101,12 +115,15 @@ namespace Plura
 
         public ObservableCollection<PlatformViewModel> Platforms { get; }
 
+        /// <summary>Solo los destinos reales. Twitch es el origen y no se muestra como tarjeta.</summary>
+        public ObservableCollection<PlatformViewModel> Destinations { get; }
+
         public ObservableCollection<SelectionChip> SelectionChips { get; }
 
         /// <summary>Plataformas que se pueden activar/desactivar (en modo consola Twitch es el origen).</summary>
         private IEnumerable<PlatformViewModel> ToggleTargets
         {
-            get { return Platforms.Where(p => p.ToggleEnabled); }
+            get { return Destinations.Where(p => p.ToggleEnabled); }
         }
 
         private void CreatePlatforms()
@@ -114,11 +131,12 @@ namespace Plura
             // Solo redes que emiten con una Stream Key sobre un servidor de ingesta
             // fijo. TikTok (URL por cuenta/región) y Plura (servidor propio) no
             // encajan en el flujo de una sola clave y se han retirado.
-            // Twitch es el origen: la Xbox emite ahí con su función nativa.
-            AddPlatform("twitch", "Twitch", "T", "#9146FF", "rtmp://live.twitch.tv/app/", false);
-            AddPlatform("youtube", "YouTube", "Y", "#FF0000", "rtmp://a.rtmp.youtube.com/live2/", false);
+            // Twitch es el origen: la Xbox emite ahí con su función nativa y no
+            // aparece como tarjeta de destino.
             AddPlatform("kick", "Kick", "K", "#53FC18", "rtmps://fa723fc1b171.global-contribute.live-video.net:443/app", true);
+            AddPlatform("youtube", "YouTube", "Y", "#FF0000", "rtmp://a.rtmp.youtube.com/live2/", false);
             AddPlatform("facebook", "Facebook Gaming", "FB", "#1877F2", "rtmps://live-api-s.facebook.com:443/rtmp/", false);
+            AddPlatform("twitch", "Twitch", "T", "#9146FF", "rtmp://live.twitch.tv/app/", false);
         }
 
         private void AddPlatform(
@@ -145,10 +163,26 @@ namespace Plura
             platform.IsConfigOpen = false;
 
             Platforms.Add(platform);
+
+            // La tarjeta de Twitch se elimina por completo del mosaico: su panel
+            // de origen sigue vivo en la columna izquierda.
+            if (!string.Equals(id, "twitch", StringComparison.OrdinalIgnoreCase))
+            {
+                Destinations.Add(platform);
+            }
         }
 
         private void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_pageCts.IsCancellationRequested)
+            {
+                _pageCts = new CancellationTokenSource();
+            }
+            if (_relayCts.IsCancellationRequested)
+            {
+                _relayCts = new CancellationTokenSource();
+            }
+
             if (!_loaded)
             {
                 _loaded = true;
@@ -160,8 +194,13 @@ namespace Plura
 
             if (_consoleMode)
             {
-                var ignoredStatus = RefreshRelayAsync(false);
-                var ignoredChannel = CheckChannelAsync(false);
+                // Una actualización rearranca el relay aunque la versión anterior
+                // hubiera quedado detenida; la configuración guardada se mantiene.
+                _store.ApplyBuildMigration();
+
+                // Secuencia única: estado → Twitch → arranque automático con la
+                // configuración ya guardada en la consola.
+                var ignored = StartConsoleModeAsync();
             }
             else
             {
@@ -175,18 +214,6 @@ namespace Plura
             ObsHostBox.Text = obs.Host;
             ObsPortBox.Text = obs.Port.ToString();
             ObsPasswordBox.Password = obs.Password;
-
-            var backendUrl = _store.LoadBackendUrl();
-            if (!string.IsNullOrWhiteSpace(backendUrl) &&
-                backendUrl.IndexOf("192.168.1.57", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                // Migración del backend antiguo (Wi-Fi) al equipo actual.
-                backendUrl = backendUrl.Replace("192.168.1.57", "192.168.1.98");
-                _store.SaveBackendUrl(backendUrl);
-            }
-            BackendUrlBox.Text = backendUrl;
-            _backend.BaseUrl = backendUrl;
-            App.Log("Backend URL: " + backendUrl);
 
             TwitchChannelBox.Text = _store.LoadTwitchChannel();
             _consoleMode = true;
@@ -463,7 +490,9 @@ namespace Plura
                 {
                     await RefreshRelayAsync(false);
 
-                    if (++_channelTicks >= 5)
+                    // Cada ~6 s para que el título cambie en la app poco después
+                    // de cambiarlo en Twitch, sin consultar en cada tick.
+                    if (++_channelTicks >= 3)
                     {
                         _channelTicks = 0;
                         await CheckChannelAsync(false);
@@ -474,6 +503,9 @@ namespace Plura
                     _polling = false;
                 }
 
+                // Supervisor: si hay una emisión guardada y el relay cayó,
+                // vuelve a levantarla en cuanto Twitch esté en vivo.
+                await AutoRestartRelayIfNeededAsync();
                 return;
             }
 
@@ -553,7 +585,7 @@ namespace Plura
 
             if (ready.Count == 0)
             {
-                ShowMessage("Configura la Stream Key de las plataformas activas.");
+                ShowMessage("Configura la clave de las plataformas activas (en Kick: clave de retransmisión).");
                 return;
             }
 
@@ -721,7 +753,7 @@ namespace Plura
             if (!IsPlatformReady(platform))
             {
                 platform.IsConfigOpen = true;
-                ShowMessage(platform.Name + ": pega la Stream Key de la plataforma.");
+                ShowMessage(platform.Name + ": pega la " + platform.StreamKeyDisplayName + ".");
                 return;
             }
 
@@ -878,31 +910,55 @@ namespace Plura
         private void ApplyModeVisibility()
         {
             // Plura funciona únicamente en modo consola: la Xbox emite a Twitch
-            // con su función nativa y el backend reparte la señal al resto.
+            // con su función nativa y el motor local reparte la señal al resto.
             ObsCard.Visibility = Visibility.Collapsed;
             XboxCard.Visibility = Visibility.Collapsed;
             StreamCard.Visibility = Visibility.Collapsed;
             ConsoleCard.Visibility = Visibility.Visible;
-            StartButton.Content = "▶  Iniciar relay";
+            StartButton.Content = "▶  Iniciar";
         }
 
-        private async Task StartConsoleRelayAsync()
+        private Task StartConsoleRelayAsync()
         {
-            if (_isBusy) { return; }
+            return StartConsoleRelayAsync(null, null, false);
+        }
+
+        /// <summary>
+        /// Inicia el relay desde la UI o desde la sesión guardada al volver del
+        /// segundo plano. Guardar la intención permite reanudarlo sin PC.
+        /// </summary>
+        private async Task StartConsoleRelayAsync(
+            string explicitChannel, IList<string> explicitTargets, bool fromRestore)
+        {
+            if (_isBusy || (_restoringRelay && !fromRestore)) { return; }
+
+            if (_pageCts.IsCancellationRequested) { _pageCts = new CancellationTokenSource(); }
+            if (_relayCts.IsCancellationRequested) { _relayCts = new CancellationTokenSource(); }
 
             if (!ApplyBackendUrl()) { return; }
 
-            var channel = NormalizeTwitchLogin(TwitchChannelBox.Text);
+            var channel = string.IsNullOrWhiteSpace(explicitChannel)
+                ? NormalizeTwitchLogin(TwitchChannelBox.Text)
+                : NormalizeTwitchLogin(explicitChannel);
             if (channel.Length == 0)
             {
-                ShowMessage("Escribe el canal de Twitch que emite desde la Xbox.");
+                if (!fromRestore)
+                {
+                    ShowMessage("Escribe el canal de Twitch que emite desde la Xbox.");
+                }
                 return;
             }
 
-            var selected = Platforms
-                .Where(p => p.Enabled &&
-                            !string.Equals(p.Id, "twitch", StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            var selected = explicitTargets == null
+                ? Platforms
+                    .Where(p => p.Enabled &&
+                                !string.Equals(p.Id, "twitch", StringComparison.OrdinalIgnoreCase))
+                    .ToList()
+                : Platforms
+                    .Where(p => explicitTargets.Any(id => string.Equals(
+                                    id, p.Id, StringComparison.OrdinalIgnoreCase)) &&
+                                !string.Equals(p.Id, "twitch", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
 
             if (selected.Count == 0)
             {
@@ -940,7 +996,8 @@ namespace Plura
                         {
                             Platform = platform.Id,
                             ServerUrl = resolved.Endpoint.ServerUrl,
-                            StreamKey = resolved.Endpoint.StreamKey
+                            StreamKey = resolved.Endpoint.StreamKey,
+                            AccountLabel = platform.AccountLabel
                         });
                     }
                     catch (Exception ex)
@@ -957,28 +1014,50 @@ namespace Plura
 
                 if (targets.Count == 0)
                 {
-                    ShowMessage("No hay destinos listos. Pega la Stream Key de al menos una plataforma.");
+                    if (!fromRestore)
+                    {
+                        ShowMessage("No hay destinos listos. Pega la clave de transmisión de al menos una plataforma (en Kick: clave de retransmisión).");
+                    }
                     return;
                 }
 
-                ShowMessage("Iniciando relay desde Twitch…");
-                var status = await _relay.StartAsync(channel, targets, _pageCts.Token);
+                // La intención se guarda ANTES de conectar: si Xbox mata la app
+                // a mitad de arranque, el supervisor podrá reanudar el relay.
+                _store.SaveRelaySession(channel, targets.Select(t => t.Platform));
+                _store.SaveTwitchChannel(channel);
+                _store.SetRelayUserStopped(false);
+
+                ShowMessage("Iniciando relay local desde Twitch…");
+                App.Log("Starting relay: " + channel + " -> " +
+                    string.Join(", ", targets.Select(t => t.Platform)));
+                // Token propio del relay: no muere si la página sale de pantalla.
+                var status = await _relay.StartAsync(channel, targets, _relayCts.Token);
                 ApplyRelayStatus(status);
+                TrackRelayMedia(status);
+                _autoStartFailures = 0;
+                _nextAutoStartUtc = DateTime.MinValue;
 
-                ShowMessage("Relay activo: Twitch → " +
-                    string.Join(" + ", targets.Select(t => t.Platform)) + ".");
+                // Audio silencioso en segundo plano: mantiene el proceso vivo
+                // cuando el jugador abre un juego o vuelve al dashboard.
+                BackgroundKeepAlive.Start();
 
+                var message = "Relay activo en la consola: Twitch → " +
+                    string.Join(" + ", targets.Select(t => t.Platform)) + ".";
                 if (incomplete.Count > 0)
                 {
-                    ShowMessage("Sin configurar: " + string.Join(", ", incomplete) + ".");
+                    message += " Sin configurar: " + string.Join(", ", incomplete) + ".";
                 }
+                ShowMessage(message);
 
                 _pollTimer.Start();
             }
             catch (Exception ex)
             {
-                ShowMessage("Relay: " + ex.Message);
-                App.Log("Relay start failed: " + ex);
+                _autoStartFailures++;
+                _nextAutoStartUtc = DateTime.UtcNow.AddSeconds(
+                    10 + Math.Min(_autoStartFailures, 6) * 10);
+                if (!fromRestore) { ShowMessage("Relay: " + ex.Message); }
+                App.Log("Relay start failed: " + ShortText(ex.Message, 220));
             }
             finally
             {
@@ -996,8 +1075,14 @@ namespace Plura
 
             try
             {
-                var status = await _relay.StopAsync(_pageCts.Token);
+                var status = await _relay.StopAsync(_relayCts.Token);
                 ApplyRelayStatus(status);
+                BackgroundKeepAlive.Stop();
+                _store.ClearRelaySession();
+                _store.SetRelayUserStopped(true);
+                _nextAutoStartUtc = DateTime.MinValue;
+                _autoStartFailures = 0;
+                _noMediaSinceUtc = DateTime.MinValue;
                 ShowMessage("Relay detenido. La emisión de la Xbox a Twitch sigue activa.");
             }
             catch (Exception ex)
@@ -1011,14 +1096,208 @@ namespace Plura
             }
         }
 
+        /// <summary>
+        /// Reanuda una emisión guardada cuando la app vuelve del segundo plano
+        /// o se abre de nuevo. Si el relay sigue vivo, solo renueva la sesión
+        /// de ejecución extendida.
+        /// </summary>
+        internal async Task RestoreRelaySessionAsync(bool forceExecution = false)
+        {
+            if (!_loaded || !_consoleMode || _isBusy || _restoringRelay) { return; }
+
+            var session = _store.LoadRelaySession();
+            if (!session.Active ||
+                string.IsNullOrWhiteSpace(session.Channel) ||
+                session.Targets.Count == 0)
+            {
+                return;
+            }
+
+            _restoringRelay = true;
+            try
+            {
+                var status = await _relay.GetStatusAsync(_relayCts.Token);
+                if (status != null && status.Running)
+                {
+                    ApplyRelayStatus(status);
+                    TrackRelayMedia(status);
+                    _relay.EnsureExtendedExecution(forceExecution);
+                    if (!_pollTimer.IsEnabled) { _pollTimer.Start(); }
+                    return;
+                }
+
+                App.Log("Restoring saved relay: " + session.Channel + " -> " +
+                    string.Join(", ", session.Targets));
+                _nextAutoStartUtc = DateTime.MinValue;
+                await AutoRestartRelayIfNeededAsync(true);
+                _relay.EnsureExtendedExecution(forceExecution);
+                if (!_pollTimer.IsEnabled) { _pollTimer.Start(); }
+            }
+            catch (Exception ex)
+            {
+                App.Log("Restore saved relay failed: " + ShortText(ex.Message, 220));
+            }
+            finally
+            {
+                _restoringRelay = false;
+            }
+        }
+
+        /// <summary>
+        /// Mantiene el estado de "sin media" para detectar un relay colgado
+        /// (RTMP aceptado pero sin segmentos útiles) y reiniciarlo.
+        /// </summary>
+        private void TrackRelayMedia(RelayStatus status)
+        {
+            if (status == null || !status.Running)
+            {
+                _noMediaSinceUtc = DateTime.MinValue;
+                return;
+            }
+
+            var flowing = status.Outputs != null &&
+                          status.Outputs.Any(o => o.BitrateKbps > 1 || o.Fps > 0);
+            if (flowing)
+            {
+                _noMediaSinceUtc = DateTime.MinValue;
+                return;
+            }
+
+            if (_noMediaSinceUtc == DateTime.MinValue)
+            {
+                _noMediaSinceUtc = DateTime.UtcNow;
+            }
+        }
+
+        /// <summary>
+        /// Supervisor del relay. Respeta la intención guardada: si el usuario
+        /// pulsó Detener no hay sesión y no se reanuda nada.
+        /// </summary>
+        private async Task AutoRestartRelayIfNeededAsync(bool ignoreGuards = false)
+        {
+            if (!_loaded || !_consoleMode) { return; }
+            if (!ignoreGuards && (_isBusy || _restoringRelay || _polling)) { return; }
+
+            var session = _store.LoadRelaySession();
+            if (!session.Active ||
+                string.IsNullOrWhiteSpace(session.Channel) ||
+                session.Targets.Count == 0)
+            {
+                return;
+            }
+
+            if (_channelInfo == null ||
+                !string.Equals(_channelInfo.Login, session.Channel, StringComparison.OrdinalIgnoreCase))
+            {
+                await CheckChannelAsync(false);
+            }
+
+            if (_channelInfo == null || !_channelInfo.Live)
+            {
+                if (_relayRunning) { return; }
+                return;
+            }
+
+            var status = await _relay.GetStatusAsync(_relayCts.Token);
+            ApplyRelayStatus(status);
+            TrackRelayMedia(status);
+
+            var stuck = _noMediaSinceUtc != DateTime.MinValue &&
+                        (DateTime.UtcNow - _noMediaSinceUtc).TotalSeconds > 45;
+            if (status.Running && !stuck)
+            {
+                _autoStartFailures = 0;
+                _nextAutoStartUtc = DateTime.MinValue;
+                return;
+            }
+
+            if (DateTime.UtcNow < _nextAutoStartUtc) { return; }
+
+            if (stuck)
+            {
+                App.Log("Relay sin media durante 45 s; reiniciando destinos.");
+                await _relay.StopAsync(_relayCts.Token);
+                ApplyRelayStatus(await _relay.GetStatusAsync(_relayCts.Token));
+                _noMediaSinceUtc = DateTime.MinValue;
+            }
+
+            var reason = stuck ? "reinicio por falta de media" : "reanudación automática";
+            App.Log("Auto-start relay (" + reason + "): " + session.Channel + " -> " +
+                string.Join(", ", session.Targets));
+            _nextAutoStartUtc = DateTime.UtcNow.AddSeconds(
+                5 + Math.Min(_autoStartFailures, 8) * 5);
+            await StartConsoleRelayAsync(session.Channel, session.Targets, true);
+        }
+
+        internal void PrepareForSuspension()
+        {
+            // Una suspensión puede congelar un arranque en curso. Se liberan los
+            // guardos para que ResumeRelayAfterBackground pueda reanudarlo.
+            _restoringRelay = false;
+            _isBusy = false;
+            _nextAutoStartUtc = DateTime.MinValue;
+        }
+
+        internal void ResumeAfterBackground()
+        {
+            if (_loaded && !_pollTimer.IsEnabled) { _pollTimer.Start(); }
+            var ignored = RestoreRelaySessionAsync(true);
+        }
+
+        /// <summary>
+        /// Al pasar a segundo plano se garantiza que el audio silencioso siga
+        /// activo: es lo que evita que Xbox congele el proceso del relay.
+        /// </summary>
+        internal void KeepAliveInBackground()
+        {
+            if (_relayRunning) { BackgroundKeepAlive.Start(); }
+        }
+
+        private async Task StartConsoleModeAsync()
+        {
+            await RefreshRelayAsync(false);
+            await CheckChannelAsync(false);
+            await RestoreRelaySessionAsync();
+            await AutoStartConfiguredRelayAsync();
+        }
+
+        /// <summary>
+        /// Si no hay una sesión guardada pero la consola ya tiene un canal y una
+        /// Stream Key configurados, arranca igualmente al abrir la app. El usuario
+        /// solo necesita pulsar Detener para impedirlo en el futuro.
+        /// </summary>
+        private async Task AutoStartConfiguredRelayAsync()
+        {
+            if (!_loaded || !_consoleMode || _isBusy || _restoringRelay) { return; }
+            if (_store.LoadRelayUserStopped()) { return; }
+
+            var session = _store.LoadRelaySession();
+            if (session.Active || (_relayStatus != null && _relayStatus.Running)) { return; }
+
+            var login = NormalizeTwitchLogin(TwitchChannelBox.Text);
+            if (login.Length == 0 || _channelInfo == null || !_channelInfo.Live) { return; }
+
+            var targets = Platforms
+                .Where(p => p.Enabled &&
+                            !string.Equals(p.Id, "twitch", StringComparison.OrdinalIgnoreCase) &&
+                            IsPlatformReady(p))
+                .Select(p => p.Id)
+                .ToList();
+            if (targets.Count == 0) { return; }
+
+            App.Log("Auto-start configured relay: " + login + " -> " + string.Join(", ", targets));
+            await StartConsoleRelayAsync(login, targets, true);
+        }
+
         private async Task RefreshRelayAsync(bool notify)
         {
-            if (!_consoleMode) { return; }
+            if (!_consoleMode || !_loaded) { return; }
 
             try
             {
-                var status = await _relay.GetStatusAsync(_pageCts.Token);
+                var status = await _relay.GetStatusAsync(_relayCts.Token);
                 ApplyRelayStatus(status);
+                TrackRelayMedia(status);
 
                 if (string.Equals(BackendStatusText.Text, "Sin conexión", StringComparison.Ordinal) ||
                     string.Equals(BackendStatusText.Text, "Sin probar", StringComparison.Ordinal))
@@ -1037,13 +1316,17 @@ namespace Plura
             catch (Exception ex)
             {
                 _relayRunning = false;
-                RelayStatusText.Text = "SIN BACKEND";
+                RelayStatusText.Text = "SIN MOTOR";
                 RelayStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 107, 122));
                 RelayStatusPill.Background = new SolidColorBrush(Color.FromArgb(255, 42, 12, 17));
                 RelayDetailText.Text =
-                    "Sin conexión con " + (_backend.BaseUrl ?? string.Empty).TrimEnd('/') +
-                    ". Enciende el backend en el PC (server\\start-backend.ps1) " +
-                    "y pulsa «Probar backend».";
+                    "El motor local no pudo consultar Twitch: " + ex.Message;
+                foreach (var platform in Platforms)
+                {
+                    platform.IsLive = false;
+                    platform.SetStatus(PlatformStatus.Idle);
+                    platform.ResetStats();
+                }
                 BackendStatusText.Text = "Sin conexión";
                 BackendStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 107, 122));
                 if (notify) { ShowMessage("Relay: " + ex.Message); }
@@ -1053,15 +1336,30 @@ namespace Plura
         private void ApplyRelayStatus(RelayStatus status)
         {
             _relayStatus = status;
+            if (status != null && !string.IsNullOrWhiteSpace(status.Title))
+            {
+                SetStreamTitle(status.Title);
+            }
             var running = status != null && status.Running;
+            var outputFailed = status != null && status.Outputs.Any(o =>
+                !string.IsNullOrWhiteSpace(o.Error) ||
+                string.Equals(o.State, "error", StringComparison.OrdinalIgnoreCase));
+            var healthy = running && !outputFailed &&
+                          string.IsNullOrWhiteSpace(status?.Error);
             var wasRunning = _relayRunning;
             _relayRunning = running;
 
-            if (running)
+            if (healthy)
             {
                 RelayStatusText.Text = "RELAY EN VIVO";
                 RelayStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 5, 5, 6));
                 RelayStatusPill.Background = new SolidColorBrush(Color.FromArgb(255, 230, 0, 35));
+            }
+            else if (running)
+            {
+                RelayStatusText.Text = "RELAY CON ERROR";
+                RelayStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 107, 122));
+                RelayStatusPill.Background = new SolidColorBrush(Color.FromArgb(255, 70, 12, 20));
             }
             else
             {
@@ -1090,7 +1388,8 @@ namespace Plura
 
                 if (running && output != null)
                 {
-                    if (string.Equals(output.State, "error", StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(output.State, "error", StringComparison.OrdinalIgnoreCase) ||
+                        !string.IsNullOrWhiteSpace(output.Error))
                     {
                         platform.IsLive = false;
                         platform.SetStatus(PlatformStatus.Error);
@@ -1128,11 +1427,14 @@ namespace Plura
                 if (running)
                 {
                     var parts = status.Outputs
-                        .Select(o => o.Platform + ": " + o.State)
+                        .Select(o => o.Platform + ": " + o.State +
+                                     (string.IsNullOrWhiteSpace(o.Error)
+                                         ? string.Empty
+                                         : " (" + o.Error + ")"))
                         .ToList();
                     RelayDetailText.Text = "Canal " + status.Channel +
                         (parts.Count > 0 ? " · " + string.Join(" · ", parts) : string.Empty) +
-                        (status.Error.Length > 0 ? " · " + status.Error : string.Empty);
+                        ((status.Error ?? string.Empty).Length > 0 ? " · " + status.Error : string.Empty);
                 }
                 else if (!string.IsNullOrWhiteSpace(status.Error))
                 {
@@ -1141,6 +1443,39 @@ namespace Plura
             }
 
             UpdateUI();
+        }
+
+        /// <summary>
+        /// Muestra en la cabecera y en la tarjeta de estado el título real del
+        /// directo de Twitch. Se llama tanto al consultar Twitch como al leer el
+        /// estado del relay, así que el cambio se refleja aunque la app esté
+        /// emitiendo en segundo plano.
+        /// </summary>
+        private void SetStreamTitle(string title)
+        {
+            var clean = (title ?? string.Empty).Trim();
+            var hasTitle = clean.Length > 0;
+            if (!hasTitle)
+            {
+                clean = _channelInfo != null && _channelInfo.Live
+                    ? "El directo de Twitch todavía no tiene título"
+                    : "Esperando el título de Twitch…";
+            }
+
+            if (string.Equals(clean, _lastDisplayedTitle, StringComparison.Ordinal)) { return; }
+
+            var changed = hasTitle;
+            _lastDisplayedTitle = clean;
+            ChannelTitleText.Text = clean;
+            HeaderTitleText.Text = clean;
+            TitleSourceText.Text = hasTitle
+                ? "Copiado automáticamente de Twitch · cambia al instante si lo editas allí."
+                : "Cuando pongas título al directo en Twitch aparecerá aquí automáticamente.";
+
+            if (changed)
+            {
+                App.Log("Twitch title now: " + ShortText(clean, 180));
+            }
         }
 
         private async Task CheckChannelAsync(bool notify)
@@ -1153,10 +1488,18 @@ namespace Plura
                 _channelInfo = null;
                 ClearChannelAvatar();
                 ChannelAvatarFallback.Text = "T";
-                ChannelStatusText.Text = "Escribe el canal de Twitch que emite desde la Xbox.";
+                ChannelStatusText.Text = "Escribe tu canal cuando quieras; se guarda automáticamente.";
                 ChannelStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 155, 155, 164));
+                SetStreamTitle(string.Empty);
+                _channelChecking = false;
+                _channelCheckError = string.Empty;
+                UpdateStartIndicator();
                 return;
             }
+
+            _channelChecking = true;
+            _channelCheckError = string.Empty;
+            UpdateStartIndicator();
 
             try
             {
@@ -1171,6 +1514,7 @@ namespace Plura
                 }
 
                 _channelInfo = info;
+                _channelCheckError = string.Empty;
                 await ApplyChannelAvatarAsync(info);
 
                 if (info.Live)
@@ -1187,10 +1531,7 @@ namespace Plura
                     ChannelStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 176, 32));
                 }
 
-                if (!string.IsNullOrWhiteSpace(info.Title))
-                {
-                    RelayDetailText.Text = info.Title;
-                }
+                SetStreamTitle(info.Title);
 
                 if (notify)
                 {
@@ -1205,10 +1546,13 @@ namespace Plura
                 ClearChannelAvatar();
                 ChannelStatusText.Text = "No se pudo comprobar el canal.";
                 ChannelStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 107, 122));
+                _channelCheckError = ex.Message;
+                App.Log("Check channel failed: " + ex.Message);
                 if (notify) { ShowMessage("Twitch: " + ex.Message); }
             }
             finally
             {
+                _channelChecking = false;
                 UpdateUI();
             }
         }
@@ -1270,20 +1614,8 @@ namespace Plura
                 }
             }
 
-            // 2) Respaldo: pedir la foto al backend por LAN (HTTP) y, si no,
-            //    usar la URL pública de Twitch. Se prueban en orden.
+            // 2) Respaldo: usar directamente la URL pública de la foto de Twitch.
             _avatarFallbacks.Clear();
-
-            var root = (_backend.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
-            if (root.Length > 0 && !string.IsNullOrEmpty(info.Login))
-            {
-                var proxy = root + "/v1/twitch/avatar?login=" +
-                            Uri.EscapeDataString(info.Login);
-                if (Uri.TryCreate(proxy, UriKind.Absolute, out var proxyUri))
-                {
-                    _avatarFallbacks.Add(proxyUri);
-                }
-            }
 
             if (url.Length > 0 &&
                 Uri.TryCreate(url, UriKind.Absolute, out var directUri) &&
@@ -1443,6 +1775,30 @@ namespace Plura
                 _channelInfo = null;
                 ClearChannelAvatar();
             }
+
+            _channelEditAt = DateTime.UtcNow;
+            if (_consoleMode) { _channelTimer.Start(); }
+        }
+
+        private async void ChannelTimer_Tick(object sender, object e)
+        {
+            _channelTimer.Stop();
+            if ((DateTime.UtcNow - _channelEditAt).TotalMilliseconds < 800) { return; }
+            if (!_consoleMode || _polling) { return; }
+
+            _polling = true;
+            try
+            {
+                await CheckChannelAsync(false);
+            }
+            catch (Exception ex)
+            {
+                App.Log("Channel check: " + ex.Message);
+            }
+            finally
+            {
+                _polling = false;
+            }
         }
 
         private static string NormalizeTwitchLogin(string value)
@@ -1505,52 +1861,46 @@ namespace Plura
             UpdateUI();
         }
 
-        // ------------------------------------------------------------- Backend
+        // --------------------------------------------------------- Motor local
 
         private bool ApplyBackendUrl()
         {
-            var url = (BackendUrlBox.Text ?? string.Empty).Trim();
-            if (url.Length == 0)
-            {
-                ShowMessage("Escribe la URL del backend de Plura, por ejemplo http://192.168.1.98:8787.");
-                return false;
-            }
-
-            _store.SaveBackendUrl(url);
-            _backend.BaseUrl = url;
+            // Ya no hay URL que configurar: el relay vive dentro de la consola.
             return true;
         }
 
         private void BackendUrlBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (!_loaded) { return; }
-            _store.SaveBackendUrl(BackendUrlBox.Text);
-            _backend.BaseUrl = BackendUrlBox.Text;
+            // Conservado por compatibilidad con XAML antiguo; no hace nada.
         }
 
         private async void TestBackend_Click(object sender, RoutedEventArgs e)
         {
-            if (!ApplyBackendUrl()) { return; }
-
             TestBackendButton.IsEnabled = false;
-            BackendStatusText.Text = "Conectando…";
+            BackendStatusText.Text = "Comprobando…";
             BackendStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 155, 155, 164));
 
             try
             {
-                var data = await _backend.GetAsync("/v1/health", _pageCts.Token);
-                var name = PluraBackendClient.GetString(data, "name", "Plura backend");
-                var version = PluraBackendClient.GetString(data, "version", string.Empty);
+                var login = NormalizeTwitchLogin(TwitchChannelBox.Text);
+                if (login.Length > 0)
+                {
+                    var info = await _relay.CheckChannelAsync(login, _pageCts.Token);
+                    BackendStatusText.Text = info.Live ? "Listo · canal en vivo" : "Listo · canal fuera de línea";
+                }
+                else
+                {
+                    BackendStatusText.Text = "Listo";
+                }
 
-                BackendStatusText.Text = "Conectado · " + name +
-                    (string.IsNullOrWhiteSpace(version) ? string.Empty : " " + version);
                 BackendStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 126, 232, 160));
+                ShowMessage("El motor local está listo: no se necesita PC ni backend.");
             }
             catch (Exception ex)
             {
                 BackendStatusText.Text = ex.Message;
                 BackendStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 107, 122));
-                ShowMessage("Backend: " + ex.Message);
+                ShowMessage("Motor local: " + ex.Message);
             }
             finally
             {
@@ -1582,37 +1932,43 @@ namespace Plura
             }
         }
 
-        /// <summary>Pega la Stream Key del portapapeles en el campo de esa plataforma.</summary>
+        /// <summary>Pega la clave de la plataforma desde el portapapeles.</summary>
         private async void PasteStreamKey_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as FrameworkElement;
             if (button == null) { return; }
+
+            var platform = button.DataContext as PlatformViewModel;
+            var keyName = platform == null
+                ? "clave de la plataforma"
+                : platform.StreamKeyDisplayName;
+            var keyNameTitle = char.ToUpperInvariant(keyName[0]) + keyName.Substring(1);
 
             try
             {
                 var content = Clipboard.GetContent();
                 if (!content.Contains(StandardDataFormats.Text))
                 {
-                    ShowMessage("El portapapeles no tiene texto. Copia la Stream Key primero.");
+                    ShowMessage("El portapapeles no tiene texto. Copia la " + keyName + " primero.");
                     return;
                 }
 
                 var text = (await content.GetTextAsync()).Trim();
                 if (text.Length == 0)
                 {
-                    ShowMessage("La Stream Key del portapapeles está vacía.");
+                    ShowMessage("La " + keyName + " del portapapeles está vacía.");
                     return;
                 }
 
                 var box = FindDescendant<PasswordBox>(button.Parent as DependencyObject);
                 if (box == null)
                 {
-                    ShowMessage("No se encontró el campo de Stream Key.");
+                    ShowMessage("No se encontró el campo de " + keyName + ".");
                     return;
                 }
 
                 box.Password = text;
-                ShowMessage("Stream Key pegada.");
+                ShowMessage(keyNameTitle + " pegada.");
             }
             catch (Exception ex)
             {
@@ -1623,6 +1979,11 @@ namespace Plura
 
         private static T FindDescendant<T>(DependencyObject root) where T : DependencyObject
         {
+            return FindDescendant<T>(root, null);
+        }
+
+        private static T FindDescendant<T>(DependencyObject root, string name) where T : DependencyObject
+        {
             if (root == null) { return null; }
 
             var count = VisualTreeHelper.GetChildrenCount(root);
@@ -1630,9 +1991,14 @@ namespace Plura
             {
                 var child = VisualTreeHelper.GetChild(root, i);
                 var match = child as T;
-                if (match != null) { return match; }
+                if (match != null &&
+                    (string.IsNullOrEmpty(name) ||
+                     string.Equals((child as FrameworkElement)?.Name, name, StringComparison.Ordinal)))
+                {
+                    return match;
+                }
 
-                var nested = FindDescendant<T>(child);
+                var nested = FindDescendant<T>(child, name);
                 if (nested != null) { return nested; }
             }
 
@@ -1775,34 +2141,24 @@ namespace Plura
                     Platforms.Any(p => p.IsLive || p.Status == PlatformStatus.Starting);
             }
 
+            StartButton.Content = _relayRunning ? "↻  Reiniciar" : "▶  Iniciar";
+
             UpdateGlobalStatus();
+            UpdateStartIndicator();
         }
 
         private void RebuildSelection()
         {
-            var signature = string.Join(",", Platforms.Select(p => p.Enabled ? "1" : "0")) +
+            var signature = string.Join(",", Destinations.Select(p => p.Enabled ? "1" : "0")) +
                             (_consoleMode ? "|console" : "|obs");
             if (signature == _selectionSignature) { return; }
             _selectionSignature = signature;
 
             SelectionChips.Clear();
 
-            foreach (var platform in Platforms)
+            foreach (var platform in Destinations)
             {
-                if (_consoleMode && platform.IsOrigin)
-                {
-                    SelectionChips.Add(new SelectionChip
-                    {
-                        Name = platform.Name + " (origen)",
-                        Accent = platform.BrandBrush,
-                        Background = new SolidColorBrush(Color.FromArgb(255, 10, 10, 12)),
-                        Foreground = new SolidColorBrush(Color.FromArgb(255, 244, 244, 246)),
-                        Border = new SolidColorBrush(Color.FromArgb(255, 230, 0, 35)),
-                        Opacity = 1.0
-                    });
-                    continue;
-                }
-
+                var brand = platform.BrandBrush.Color;
                 var on = platform.Enabled;
                 SelectionChips.Add(new SelectionChip
                 {
@@ -1815,13 +2171,13 @@ namespace Plura
                         ? Color.FromArgb(255, 244, 244, 246)
                         : Color.FromArgb(255, 120, 120, 130)),
                     Border = new SolidColorBrush(on
-                        ? Color.FromArgb(150, 230, 0, 35)
+                        ? Color.FromArgb(170, brand.R, brand.G, brand.B)
                         : Color.FromArgb(40, 255, 255, 255)),
                     Opacity = on ? 1.0 : 0.6
                 });
             }
 
-            var selected = Platforms.Where(p => p.Enabled && p.ToggleEnabled).Select(p => p.Name).ToList();
+            var selected = Destinations.Where(p => p.Enabled && p.ToggleEnabled).Select(p => p.Name).ToList();
             if (selected.Count == 0)
             {
                 SelectionSummary.Text = _consoleMode
@@ -1835,6 +2191,94 @@ namespace Plura
                                         string.Join(" · ", selected);
                 SelectionSummary.Foreground = new SolidColorBrush(Color.FromArgb(255, 244, 244, 246));
             }
+        }
+
+        private static string ShortText(string value, int max)
+        {
+            var text = (value ?? string.Empty).Trim();
+            if (text.Length <= max) { return text; }
+            return text.Substring(0, max - 1) + "…";
+        }
+
+        /// <summary>Indicador junto a Iniciar: emisión de Twitch, relay y errores.</summary>
+        private void UpdateStartIndicator()
+        {
+            if (!_loaded || StartStatusText == null) { return; }
+
+            var outputError = _relayStatus?.Outputs == null
+                ? null
+                : _relayStatus.Outputs
+                    .Select(o => o.Error)
+                    .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+            var relayError = string.IsNullOrWhiteSpace(_relayStatus?.Error)
+                ? outputError
+                : _relayStatus.Error;
+
+            string text;
+            byte r, g, b, br, bg, bb;
+
+            if (!string.IsNullOrWhiteSpace(relayError))
+            {
+                text = "ERROR RELAY · " + ShortText(relayError, 26);
+                r = 255; g = 107; b = 122;
+                br = 70; bg = 16; bb = 28;
+            }
+            else if (_relayRunning)
+            {
+                // El relay puede estar "running" antes de recibir el primer
+                // segmento útil. Solo mostramos verde cuando hay medios fluyendo.
+                var flowing = _relayStatus?.Outputs != null &&
+                              _relayStatus.Outputs.Any(o => o.BitrateKbps > 1 || o.Fps > 0);
+                text = flowing ? "EN EMISIÓN · RELAY OK" : "EN VIVO · SIN MEDIA";
+                r = flowing ? (byte)126 : (byte)255;
+                g = flowing ? (byte)232 : (byte)176;
+                b = flowing ? (byte)160 : (byte)32;
+                br = flowing ? (byte)16 : (byte)42;
+                bg = flowing ? (byte)42 : (byte)34;
+                bb = flowing ? (byte)27 : (byte)16;
+            }
+            else if (_isBusy)
+            {
+                text = "INICIANDO…";
+                r = 255; g = 176; b = 32;
+                br = 42; bg = 34; bb = 16;
+            }
+            else if (!string.IsNullOrWhiteSpace(_channelCheckError))
+            {
+                text = "SIN TWITCH · " + ShortText(_channelCheckError, 24);
+                r = 255; g = 107; b = 122;
+                br = 70; bg = 16; bb = 28;
+            }
+            else if (_channelChecking)
+            {
+                text = "COMPROBANDO…";
+                r = 255; g = 176; b = 32;
+                br = 42; bg = 34; bb = 16;
+            }
+            else if (_channelInfo != null && _channelInfo.Live)
+            {
+                text = "EN VIVO · SIN RELAY";
+                r = 255; g = 176; b = 32;
+                br = 42; bg = 34; bb = 16;
+            }
+            else if (_channelInfo != null)
+            {
+                text = "FUERA DE LÍNEA";
+                r = 155; g = 155; b = 164;
+                br = 30; bg = 30; bb = 34;
+            }
+            else
+            {
+                text = "COMPROBANDO…";
+                r = 155; g = 155; b = 164;
+                br = 30; bg = 30; bb = 34;
+            }
+
+            StartStatusText.Text = text;
+            var foreground = new SolidColorBrush(Color.FromArgb(255, r, g, b));
+            StartStatusText.Foreground = foreground;
+            StartStatusDot.Fill = foreground;
+            StartStatusPill.Background = new SolidColorBrush(Color.FromArgb(255, br, bg, bb));
         }
 
         private void UpdateGlobalStatus()
