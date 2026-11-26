@@ -66,7 +66,7 @@ namespace Plura.Services
         private const string RelayTargetsKey = "plura.relay.targets";
         private const string RelayUserStoppedKey = "plura.relay.userstopped";
         private const string AppBuildKey = "plura.app.build";
-        private const string CurrentAppBuild = "1.0.0.80";
+        private const string CurrentAppBuild = "1.0.0.81";
 
         private static readonly Dictionary<string, object> Fallback =
             new Dictionary<string, object>(StringComparer.Ordinal);
