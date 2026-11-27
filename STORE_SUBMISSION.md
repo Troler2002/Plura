@@ -5,8 +5,10 @@
 - Producto creado en Partner Center: **Plura Multistream**
   (`Store ID 9P1R7RRWPMF0`, PFN
   `Troler2002.PluraMultistream_r94ygybagfcxc`).
-- Submission 1 enviada a certificación el 26/11/2026. El enlace de la Store se muestra
-  en Partner Center cuando el producto esté publicado.
+- Submission 1 enviada a certificación el 26/11/2026. Microsoft la rechazó el
+  27/11/2026 por las palabras clave (política 10.1.3 Search Terms). Se corrigieron
+  y la submission se reenvió a certificación. El enlace de la Store se muestra en
+  Partner Center cuando el producto esté publicado.
 - El nombre exacto **Plura** no está disponible y no se pudo reservar para este
   producto. Por decisión del usuario, el paquete de la Store usa
   `DisplayName=Plura Multistream` para pasar la validación. Las instalaciones
@@ -37,8 +39,10 @@
   - El relay sigue en segundo plano y se reanuda al volver a la app o tras
     suspender/reaniciar la consola.
 
-- **Palabras clave:** xbox, stream, directo, multistream, twitch, kick, youtube,
-  facebook gaming, retransmisión, relay
+- **Palabras clave:** stream, directo, multidifusión, retransmisión, emisión,
+  consola, sin pc. Microsoft rechazó la primera revisión porque `xbox` y
+  `xbox multistream twitch kick` son títulos de productos de terceros; se
+  sustituyeron por términos genéricos antes de reenviar la submission.
 - **Categoría:** Entertainment → Utilities + tools
 - **Dispositivos:** Xbox One / Xbox Series X|S (Windows 10/11 Xbox).
 - **Precio:** Gratis.

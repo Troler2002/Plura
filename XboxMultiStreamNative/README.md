@@ -6,8 +6,9 @@ de red es C#.
 
 > La versión enviada a la Microsoft Store se publica como **Plura Multistream**
 > (Store ID `9P1R7RRWPMF0`) porque el nombre exacto «Plura» no estaba disponible.
-> Está en certificación desde el 26/11/2026. El sideload de desarrollo conserva el
-> nombre **Plura** y la identidad `Plura.OnDevice`.
+> Está en certificación desde el 26/11/2026 y se reenvió el 27/11/2026 tras corregir
+> las palabras clave. El sideload de desarrollo conserva el nombre **Plura** y la
+> identidad `Plura.OnDevice`.
 
 ## Qué hace
 
@@ -236,8 +237,8 @@ extendida básica no necesita capacidades restringidas, así que no se declara
 - Release `1.0.0.80` compilada con .NET Native e instalada en la consola como
   `Plura.OnDevice_1.0.0.80_x64__e3cqhx40v3yww`, con título real de Twitch y
   `RTMP publish accepted` verificado en Device Portal.
-- Store: paquete `Plura_1.0.0.0_x64_bundle.msixupload` validado sin errores y enviado a
-  certificación el 26/11/2026.
+- Store: paquete `Plura_1.0.0.0_x64_bundle.msixupload` validado sin errores,
+  enviado el 26/11/2026 y reenviado el 27/11/2026 tras corregir palabras clave.
 - **Pendiente**: resultado de la certificación y enlace público de la Store.
 - La verificación de la interfaz se hace por captura del Device Portal y por
   `LocalState/plura.log`.

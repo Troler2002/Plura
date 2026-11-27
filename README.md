@@ -31,8 +31,9 @@ elegir exactamente a qué plataformas quieres transmitir (todas o solo algunas).
 La versión de la Microsoft Store se llama **Plura Multistream**
 (Store ID `9P1R7RRWPMF0`, PFN `Troler2002.PluraMultistream_r94ygybagfcxc`). El
 nombre exacto «Plura» no estaba disponible para reservar, así que la primera
-submission se envió a certificación con ese nombre visible el 26/11/2026. El
-enlace público de la Store se añadirá aquí cuando la certificación termine.
+submission se envió a certificación con ese nombre visible el 26/11/2026 y se
+reenvió el 27/11/2026 tras corregir las palabras clave. El enlace público de la
+Store se añadirá aquí cuando la certificación termine.
 Los despliegues locales de desarrollo (`Plura.OnDevice`) siguen apareciendo en
 la consola como **Plura**.
 
