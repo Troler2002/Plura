@@ -4,11 +4,12 @@ App **UWP nativa (C# + XAML)** para consolas Xbox. Se llama **Plura** en la cons
 el tema rojo/negro. **No usa WebView**: toda la interfaz es XAML nativo y toda la lógica
 de red es C#.
 
-> La versión enviada a la Microsoft Store se publica como **Plura Multistream**
+> La versión de la Microsoft Store se publicó como **Plura Multistream**
 > (Store ID `9P1R7RRWPMF0`) porque el nombre exacto «Plura» no estaba disponible.
-> Está en certificación desde el 26/11/2026 y se reenvió el 27/11/2026 tras corregir
-> las palabras clave. El sideload de desarrollo conserva el nombre **Plura** y la
-> identidad `Plura.OnDevice`.
+> Se envió el 26/11/2026, se corrigió el 27/11/2026 y se publicó el 28/11/2026.
+> Enlace: https://apps.microsoft.com/detail/9P1R7RRWPMF0
+> El sideload de desarrollo conserva el nombre **Plura** y la identidad
+> `Plura.OnDevice`.
 
 ## Qué hace
 
@@ -223,8 +224,8 @@ extendida básica no necesita capacidades restringidas, así que no se declara
   revoca, el supervisor interno reanuda el trabajo al volver a la app.
 - El viaje ida y vuelta por Twitch añade latencia frente a una captura directa, que no
   existe para apps de terceros en Xbox.
-- La primera versión de Store está en certificación; hasta que esté publicada, el
-  sideload requiere **Modo Desarrollador**.
+- La versión de Store ya está publicada como **Plura Multistream**; el sideload
+  de desarrollo (`Plura.OnDevice`) sigue requiriendo **Modo Desarrollador**.
 - Solo se admiten redes con servidor de ingesta fijo y clave manual. TikTok (URL por
   cuenta/región) y Plura (servidor propio) quedaron fuera de esta versión.
 
@@ -238,7 +239,8 @@ extendida básica no necesita capacidades restringidas, así que no se declara
   `Plura.OnDevice_1.0.0.80_x64__e3cqhx40v3yww`, con título real de Twitch y
   `RTMP publish accepted` verificado en Device Portal.
 - Store: paquete `Plura_1.0.0.0_x64_bundle.msixupload` validado sin errores,
-  enviado el 26/11/2026 y reenviado el 27/11/2026 tras corregir palabras clave.
-- **Pendiente**: resultado de la certificación y enlace público de la Store.
+  enviado el 26/11/2026, corregido el 27/11/2026 y publicado el 28/11/2026.
+- Enlaces: https://apps.microsoft.com/detail/9P1R7RRWPMF0 y
+  `ms-windows-store://pdp/?productid=9P1R7RRWPMF0`.
 - La verificación de la interfaz se hace por captura del Device Portal y por
   `LocalState/plura.log`.

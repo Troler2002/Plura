@@ -6,9 +6,11 @@
   (`Store ID 9P1R7RRWPMF0`, PFN
   `Troler2002.PluraMultistream_r94ygybagfcxc`).
 - Submission 1 enviada a certificación el 26/11/2026. Microsoft la rechazó el
-  27/11/2026 por las palabras clave (política 10.1.3 Search Terms). Se corrigieron
-  y la submission se reenvió a certificación. El enlace de la Store se muestra en
-  Partner Center cuando el producto esté publicado.
+  27/11/2026 por las palabras clave (política 10.1.3 Search Terms). Se corrigieron,
+  la submission se reenvió y se publicó el 28/11/2026.
+- Enlaces públicos confirmados en Product identity:
+  https://apps.microsoft.com/detail/9P1R7RRWPMF0 y
+  `ms-windows-store://pdp/?productid=9P1R7RRWPMF0`.
 - El nombre exacto **Plura** no está disponible y no se pudo reservar para este
   producto. Por decisión del usuario, el paquete de la Store usa
   `DisplayName=Plura Multistream` para pasar la validación. Las instalaciones

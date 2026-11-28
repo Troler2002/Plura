@@ -28,12 +28,14 @@ elegir exactamente a qué plataformas quieres transmitir (todas o solo algunas).
 
 ## Estado de publicación
 
-La versión de la Microsoft Store se llama **Plura Multistream**
+La versión publicada en la Microsoft Store se llama **Plura Multistream**
 (Store ID `9P1R7RRWPMF0`, PFN `Troler2002.PluraMultistream_r94ygybagfcxc`). El
-nombre exacto «Plura» no estaba disponible para reservar, así que la primera
-submission se envió a certificación con ese nombre visible el 26/11/2026 y se
-reenvió el 27/11/2026 tras corregir las palabras clave. El enlace público de la
-Store se añadirá aquí cuando la certificación termine.
+nombre exacto «Plura» no estaba disponible para reservar. La primera submission
+se envió el 26/11/2026, se corrigió el 27/11/2026 y se publicó el 28/11/2026.
+
+- Enlace web: https://apps.microsoft.com/detail/9P1R7RRWPMF0
+- Enlace para abrirlo en la consola: `ms-windows-store://pdp/?productid=9P1R7RRWPMF0`
+
 Los despliegues locales de desarrollo (`Plura.OnDevice`) siguen apareciendo en
 la consola como **Plura**.
 
@@ -92,9 +94,9 @@ la consola como **Plura**.
 4. La app sin PC aparece en la consola como **Plura** (`Plura.OnDevice`). Los
    despliegues antiguos (`PluraLoose`, `PluraNative` y `Plura.Xbox`) se conservan.
 
-> Hasta que la certificación de la Store termine, la instalación requiere Modo
-> Desarrollador. La versión publicada se instalará desde la Microsoft Store con el
-> nombre **Plura Multistream**; no necesitará Modo Desarrollador.
+> La versión de Store ya está publicada como **Plura Multistream** y se instala
+> desde https://apps.microsoft.com/detail/9P1R7RRWPMF0 sin Modo Desarrollador.
+> El sideload de desarrollo (`Plura.OnDevice`) sigue requiriendo Modo Desarrollador.
 
 ---
 
@@ -254,8 +256,8 @@ plura/
   al volver a la app; la concesión depende del sistema.
 - El viaje ida y vuelta por Twitch añade latencia respecto a una captura directa, que no
   existe para apps de terceros en Xbox.
-- La primera versión de Store está en certificación; hasta que esté publicada, el
-  sideload sigue requiriendo **Modo Desarrollador**.
+- La versión de Store ya está publicada como **Plura Multistream**; el sideload
+  de desarrollo (`Plura.OnDevice`) sigue requiriendo **Modo Desarrollador**.
 - Solo se admiten redes con servidor de ingesta fijo y clave manual. **TikTok** (URL por
   cuenta/región) y **Plura** (servidor propio) no encajan en el flujo de una sola clave
   y no aparecen en esta versión.
