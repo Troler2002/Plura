@@ -240,6 +240,10 @@ extendida básica no necesita capacidades restringidas, así que no se declara
 - Release `1.0.0.80` compilada con .NET Native e instalada en la consola como
   `Plura.OnDevice_1.0.0.80_x64__e3cqhx40v3yww`, con título real de Twitch y
   `RTMP publish accepted` verificado en Device Portal.
+- Release `1.1.0.0` compilada con .NET Native, firmada con el certificado de
+  desarrollo e instalada en la consola mediante Device Portal como
+  `Plura.OnDevice_1.1.0.0_x64__e3cqhx40v3yww` (la versión `1.0.0.80` quedó
+  sustituida; `Plura.Xbox` no se modificó).
 - Store: paquete `Plura_1.0.0.0_x64_bundle.msixupload` validado sin errores,
   enviado el 26/11/2026, corregido el 27/11/2026 y publicado el 28/11/2026.
   La actualización `Plura_1.1.0.0_x64_bundle.msixupload` fue validada sin
