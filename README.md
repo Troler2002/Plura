@@ -32,6 +32,9 @@ La versión publicada en la Microsoft Store se llama **Plura Multistream**
 (Store ID `9P1R7RRWPMF0`, PFN `Troler2002.PluraMultistream_r94ygybagfcxc`). El
 nombre exacto «Plura» no estaba disponible para reservar. La primera submission
 se envió el 26/11/2026, se corrigió el 27/11/2026 y se publicó el 28/11/2026.
+La actualización `1.1.0.0` se envió a certificación el 28/11/2026: corrige los
+cortes de señal en segundo plano y hace que el icono de Xbox coincida con la
+ficha web; hasta que se publique sigue activa la versión `1.0.0.0`.
 
 - Enlace web: https://apps.microsoft.com/detail/9P1R7RRWPMF0
 - Enlace para abrirlo en la consola: `ms-windows-store://pdp/?productid=9P1R7RRWPMF0`

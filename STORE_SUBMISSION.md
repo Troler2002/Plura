@@ -15,13 +15,38 @@
   producto. Por decisión del usuario, el paquete de la Store usa
   `DisplayName=Plura Multistream` para pasar la validación. Las instalaciones
   locales anteriores (`Plura.OnDevice`) siguen mostrando **Plura**.
-- Paquete de publicación: `StorePackages/Plura_1.0.0.0_x64_bundle.msixupload`
+- Paquete publicado: `StorePackages/Plura_1.0.0.0_x64_bundle.msixupload`
   (versión `1.0.0.0`: el cuarto componente debe ser cero en la Store).
+- Submission 2 (update): creada con **Start update** el 28/11/2026 sin cancelar ni
+  editar la submission publicada. Paquete
+  `StorePackages/Plura_1.1.0.0_x64_bundle.msixupload`, validado sin errores y
+  enviado a certificación el 28/11/2026 (`submitted=true`,
+  `Submission_Status_InCertification`). Hasta que pase certificación sigue
+  publicada la versión `1.0.0.0`.
 - Script reproducible: `XboxMultiStreamNative/build-store.ps1`.
 - Captura de la ficha: `StoreAssets/Screenshot-1.png` (1920×1080).
 - Política de privacidad: `PRIVACY.md`, publicada en
   `https://github.com/Troler2002/Plura/blob/main/PRIVACY.md`.
 - Se aceptó la versión 8.11 del Windows App Developer Agreement.
+
+## Cambios de la versión 1.1.0.0
+
+- Salud por destino con `LastMediaUtc`/`MediaFresh`, métricas que se limpian al
+  reconectar y `RelayStatus.Healthy` para que el supervisor no confíe solo en
+  `status.Running`.
+- Watchdog interno independiente del dispatcher que sustituye workers en
+  `error`, desconectados o sin media durante 45 s.
+- Renovación del HLS de Twitch con reintentos acotados, incluida la refresh
+  programada a los 9 minutos; los segmentos fallidos se reintentan sin tumbar
+  el relay.
+- Rearme del archivo de silencio (`MediaPlayer`) y de la sesión básica de
+  ejecución extendida cuando se revocan; excepciones no controladas marcadas
+  como handled para que no cierren la app en segundo plano.
+- Box art 1080×1080 regenerado desde `Assets/LargeTile.png`, la misma imagen
+  que usa la ficha web (`og:image`), para que el icono de Xbox coincida con la
+  Store. El poster art sigue siendo el original.
+- Notas de la versión en la ficha: corrección de la pérdida de señal en segundo
+  plano, renovación segura del HLS y rearme del audio de fondo.
 
 ## Configuración de la ficha
 
@@ -66,8 +91,10 @@
   `ApplicationData.Current.LocalSettings` de la consola.
 - Revisa que el uso de Plura cumpla los términos de Twitch y de los destinos.
 
-## Después de publicar
+## Pendiente tras la certificación de la submission 2
 
-- Actualizar `README.md` y `XboxMultiStreamNative/README.md` con el enlace de la
-  Store y el nombre definitivo del paquete.
+- Comprobar que la ficha pública y la consola muestran el box art rojo/negro
+  regenerado desde `LargeTile.png`.
+- Actualizar este documento con la fecha de publicación de `1.1.0.0` y el
+  nuevo estado `Submission_Status_In_Store`.
 - Hacer commit y push a `https://github.com/Troler2002/Plura.git`.

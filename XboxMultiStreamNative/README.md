@@ -7,6 +7,8 @@ de red es C#.
 > La versión de la Microsoft Store se publicó como **Plura Multistream**
 > (Store ID `9P1R7RRWPMF0`) porque el nombre exacto «Plura» no estaba disponible.
 > Se envió el 26/11/2026, se corrigió el 27/11/2026 y se publicó el 28/11/2026.
+> La versión `1.1.0.0` se envió a certificación el 28/11/2026 con las correcciones
+> del relay en segundo plano y el box art igual al icono de la ficha web.
 > Enlace: https://apps.microsoft.com/detail/9P1R7RRWPMF0
 > El sideload de desarrollo conserva el nombre **Plura** y la identidad
 > `Plura.OnDevice`.
@@ -240,6 +242,8 @@ extendida básica no necesita capacidades restringidas, así que no se declara
   `RTMP publish accepted` verificado en Device Portal.
 - Store: paquete `Plura_1.0.0.0_x64_bundle.msixupload` validado sin errores,
   enviado el 26/11/2026, corregido el 27/11/2026 y publicado el 28/11/2026.
+  La actualización `Plura_1.1.0.0_x64_bundle.msixupload` fue validada sin
+  errores y enviada a certificación el 28/11/2026.
 - Enlaces: https://apps.microsoft.com/detail/9P1R7RRWPMF0 y
   `ms-windows-store://pdp/?productid=9P1R7RRWPMF0`.
 - La verificación de la interfaz se hace por captura del Device Portal y por
