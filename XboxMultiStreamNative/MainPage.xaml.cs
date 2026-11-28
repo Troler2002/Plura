@@ -1221,7 +1221,11 @@ namespace Plura
                                status.Outputs.Any(o =>
                                    !string.IsNullOrWhiteSpace(o.Error) ||
                                    string.Equals(o.State, "error", StringComparison.OrdinalIgnoreCase));
-            var relayFailed = status == null || !status.Running || outputFailed ||
+            var staleOutput = status != null && status.Running &&
+                              status.UptimeSeconds > 20 &&
+                              status.Outputs.Count > 0 &&
+                              status.Outputs.Any(o => !IsOutputSending(o));
+            var relayFailed = status == null || !status.Running || outputFailed || staleOutput ||
                               !string.IsNullOrWhiteSpace(status.Error);
             var stuck = _noMediaSinceUtc != DateTime.MinValue &&
                         (DateTime.UtcNow - _noMediaSinceUtc).TotalSeconds > 45;
@@ -1358,6 +1362,21 @@ namespace Plura
             }
         }
 
+        /// <summary>
+        /// Un destino solo está realmente en directo si RTMP sigue recibiendo
+        /// media reciente. El estado "running" por sí solo puede quedarse
+        /// colgado cuando Xbox congela el proceso o el servidor RTMP deja de
+        /// aceptar datos sin cerrar el socket.
+        /// </summary>
+        private static bool IsOutputSending(RelayOutputStatus output)
+        {
+            return output != null &&
+                   string.Equals(output.State, "running", StringComparison.OrdinalIgnoreCase) &&
+                   string.IsNullOrWhiteSpace(output.Error) &&
+                   output.MediaFresh &&
+                   (output.BitrateKbps > 1 || output.Fps > 0);
+        }
+
         private static bool IsRelayHealthy(RelayStatus status)
         {
             if (status == null || !status.Running ||
@@ -1366,9 +1385,16 @@ namespace Plura
                 return false;
             }
             if (status.Outputs == null || status.Outputs.Count == 0) { return false; }
-            return status.Outputs.All(o =>
-                string.IsNullOrWhiteSpace(o.Error) &&
-                !string.Equals(o.State, "error", StringComparison.OrdinalIgnoreCase));
+            if (status.Outputs.Any(o => !string.IsNullOrWhiteSpace(o.Error) ||
+                string.Equals(o.State, "error", StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            // Durante los primeros segundos no hay métricas todavía; no hay que
+            // reiniciar un relay que acaba de arrancar.
+            if (status.UptimeSeconds <= 15) { return true; }
+            return status.Outputs.All(IsOutputSending);
         }
 
         private void ApplyRelayStatus(RelayStatus status)
@@ -1382,8 +1408,9 @@ namespace Plura
             var outputFailed = status != null && status.Outputs.Any(o =>
                 !string.IsNullOrWhiteSpace(o.Error) ||
                 string.Equals(o.State, "error", StringComparison.OrdinalIgnoreCase));
-            var healthy = running && !outputFailed &&
-                          string.IsNullOrWhiteSpace(status?.Error);
+            var healthy = IsRelayHealthy(status);
+            var noSignal = running && !healthy && !outputFailed &&
+                           string.IsNullOrWhiteSpace(status?.Error);
             var wasRunning = _relayRunning;
             _relayRunning = running;
 
@@ -1392,6 +1419,12 @@ namespace Plura
                 RelayStatusText.Text = "RELAY EN VIVO";
                 RelayStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 5, 5, 6));
                 RelayStatusPill.Background = new SolidColorBrush(Color.FromArgb(255, 230, 0, 35));
+            }
+            else if (running && noSignal)
+            {
+                RelayStatusText.Text = "RELAY SIN SEÑAL";
+                RelayStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 196, 92));
+                RelayStatusPill.Background = new SolidColorBrush(Color.FromArgb(255, 74, 52, 8));
             }
             else if (running)
             {
@@ -1435,7 +1468,7 @@ namespace Plura
                         continue;
                     }
 
-                    var sending = string.Equals(output.State, "running", StringComparison.OrdinalIgnoreCase);
+                    var sending = IsOutputSending(output);
                     platform.IsLive = sending;
                     platform.SetStatus(sending ? PlatformStatus.Live : PlatformStatus.Starting);
                     platform.BitrateText = FormatBitrate(output.BitrateKbps * 1000.0);
@@ -1466,6 +1499,7 @@ namespace Plura
                 {
                     var parts = status.Outputs
                         .Select(o => o.Platform + ": " + o.State +
+                                     (IsOutputSending(o) ? " · enviando" : " · sin señal") +
                                      (string.IsNullOrWhiteSpace(o.Error)
                                          ? string.Empty
                                          : " (" + o.Error + ")"))

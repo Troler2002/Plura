@@ -29,6 +29,24 @@
   `https://github.com/Troler2002/Plura/blob/main/PRIVACY.md`.
 - Se aceptó la versión 8.11 del Windows App Developer Agreement.
 
+## Cambios de la versión 1.2.0.0 (código listo; submission pendiente)
+
+- `BackgroundKeepAlive` crea el nuevo reproductor antes de liberar el anterior y
+  añade un watchdog que comprueba el estado de `MediaPlayer` cada 5 s, así que
+  una pausa del silencio de fondo ya no congela la app con el relay "en vivo".
+- El watchdog interno del relay rearma también el audio silencioso y sustituye
+  salidas que siguen en estado `running` pero llevan más de 30 s a cero
+  bitrate/FPS o 45 s sin media.
+- La UI solo muestra LIVE cuando el destino tiene `MediaFresh` y tráfico real;
+  si el relay sigue "running" pero no envía, muestra `RELAY SIN SEÑAL` y el
+  supervisor reinicia las salidas.
+- Versiones `1.2.0.0` en manifiesto, `AssemblyInfo` y `CurrentAppBuild`, con
+  cuarto componente cero como exige la Store.
+- Despliegue de desarrollo verificado en la consola como
+  `Plura.OnDevice_1.2.0.0_x64__e3cqhx40v3yww`. La próxima actualización de la
+  Store debe crearse con **Start update** cuando termine la certificación de la
+  submission 2; no se cancela ni edita ninguna submission publicada.
+
 ## Cambios de la versión 1.1.0.0
 
 - Salud por destino con `LastMediaUtc`/`MediaFresh`, métricas que se limpian al

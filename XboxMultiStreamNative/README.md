@@ -9,6 +9,9 @@ de red es C#.
 > Se envió el 26/11/2026, se corrigió el 27/11/2026 y se publicó el 28/11/2026.
 > La versión `1.1.0.0` se envió a certificación el 28/11/2026 con las correcciones
 > del relay en segundo plano y el box art igual al icono de la ficha web.
+> La revisión `1.2.0.0` añade un watchdog del silencio de fondo, estado LIVE
+> basado en media real y reinicio de salidas silenciosas; se desplegó en la
+> consola de desarrollo como `Plura.OnDevice_1.2.0.0_x64__e3cqhx40v3yww`.
 > Enlace: https://apps.microsoft.com/detail/9P1R7RRWPMF0
 > El sideload de desarrollo conserva el nombre **Plura** y la identidad
 > `Plura.OnDevice`.
@@ -244,6 +247,9 @@ extendida básica no necesita capacidades restringidas, así que no se declara
   desarrollo e instalada en la consola mediante Device Portal como
   `Plura.OnDevice_1.1.0.0_x64__e3cqhx40v3yww` (la versión `1.0.0.80` quedó
   sustituida; `Plura.Xbox` no se modificó).
+- Release `1.2.0.0` compilada con .NET Native y desplegada en la consola como
+  `Plura.OnDevice_1.2.0.0_x64__e3cqhx40v3yww` para corregir el falso aviso de
+  directo cuando Xbox pausa el audio de fondo. `Plura.Xbox` sigue intacto.
 - Store: paquete `Plura_1.0.0.0_x64_bundle.msixupload` validado sin errores,
   enviado el 26/11/2026, corregido el 27/11/2026 y publicado el 28/11/2026.
   La actualización `Plura_1.1.0.0_x64_bundle.msixupload` fue validada sin

@@ -7,7 +7,7 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap3 mp rescap">
 
-  <Identity Name="Troler2002.PluraMultistream" Publisher="CN=5110E329-4540-4E9B-B5DE-A8D6F794F31C" Version="1.1.0.0" />
+  <Identity Name="Troler2002.PluraMultistream" Publisher="CN=5110E329-4540-4E9B-B5DE-A8D6F794F31C" Version="1.2.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="b7a3e2c1-9d4f-4a6b-8c2e-5f1a0d3b7c94" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 

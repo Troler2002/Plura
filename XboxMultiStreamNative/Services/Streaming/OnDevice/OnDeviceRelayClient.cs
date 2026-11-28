@@ -101,6 +101,7 @@ namespace Plura.Services.Streaming.OnDevice
             var titleToken = _runCts.Token;
             var ignoredTitleSync = Task.Run(() => TitleSyncLoopAsync(titleToken));
             var ignored = RequestExtendedExecutionAsync();
+            BackgroundKeepAlive.Start();
             StartHealthTimer(_generation);
             App.Log("On-device relay started for " + login + " with " + deduped.Count + " outputs" +
                     (_title.Length > 0 ? " · title=\"" + _title + "\"" : string.Empty));
@@ -110,12 +111,14 @@ namespace Plura.Services.Streaming.OnDevice
         public async Task<RelayStatus> StopAsync(CancellationToken token)
         {
             StopHealthTimer();
+            BackgroundKeepAlive.Stop();
             OutputWorker[] workers;
             CancellationTokenSource runCts;
             IDisposable session;
 
             lock (_gate)
             {
+                if (_running) { App.Log("Relay stop requested"); }
                 _generation++;
                 _running = false;
                 _title = string.Empty;
@@ -652,6 +655,12 @@ namespace Plura.Services.Streaming.OnDevice
                 {
                     if (!_running || generation != _generation || _runCts == null) { return; }
                     var token = _runCts.Token;
+
+                    // El watchdog del relay sigue corriendo aunque el hilo de la
+                    // interfaz esté estrangulado: es el sitio más seguro para
+                    // volver a poner el audio silencioso que mantiene viva la app.
+                    BackgroundKeepAlive.EnsureRunning();
+
                     stale.AddRange(_workers.Values.Where(IsWorkerUnhealthy));
 
                     foreach (var worker in stale)
@@ -707,7 +716,14 @@ namespace Plura.Services.Streaming.OnDevice
             {
                 return worker.Status.DurationSeconds > 60;
             }
-            return (now - worker.Status.LastMediaUtc).TotalSeconds > 45;
+            if ((now - worker.Status.LastMediaUtc).TotalSeconds > 45) { return true; }
+
+            // Un socket puede seguir "conectado" mientras el servidor ya no
+            // acepta datos: el contador de bits queda a cero aunque HLS siga
+            // entregando segmentos. Cortamos y volvemos a publicar.
+            return worker.Status.DurationSeconds > 30 &&
+                   worker.Status.BitrateKbps <= 1 &&
+                   worker.Status.Fps <= 0;
         }
 
         // ----------------------------------------- ejecución en segundo plano
