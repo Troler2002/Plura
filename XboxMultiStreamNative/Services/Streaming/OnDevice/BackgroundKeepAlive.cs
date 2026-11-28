@@ -14,14 +14,24 @@ namespace Plura.Services.Streaming.OnDevice
         private static readonly object Gate = new object();
         private static MediaPlayer _player;
         private static bool _started;
+        private static DateTime _lastRestartUtc = DateTime.MinValue;
 
         public static void Start()
         {
+            MediaPlayer previous;
             lock (Gate)
             {
-                if (_started) { return; }
+                if (_started && IsPlaying(_player)) { return; }
+                if (_player != null &&
+                    (DateTime.UtcNow - _lastRestartUtc).TotalSeconds < 5)
+                {
+                    return;
+                }
+                previous = _player;
+                _player = null;
                 _started = true;
             }
+            DisposePlayer(previous);
 
             try
             {
@@ -39,7 +49,15 @@ namespace Plura.Services.Streaming.OnDevice
                     new Uri("ms-appx:///Assets/silence.wav"));
                 player.Play();
 
-                lock (Gate) { _player = player; }
+                lock (Gate)
+                {
+                    _player = player;
+                    _started = true;
+                    _lastRestartUtc = DateTime.UtcNow;
+                }
+
+                player.PlaybackSession.PlaybackStateChanged += PlaybackStateChanged;
+                player.MediaFailed += MediaFailed;
                 App.Log("Background media keep-alive started");
             }
             catch (Exception ex)
@@ -47,6 +65,65 @@ namespace Plura.Services.Streaming.OnDevice
                 lock (Gate) { _started = false; }
                 App.Log("Background media keep-alive failed: " + ex.Message);
             }
+        }
+
+        private static bool IsPlaying(MediaPlayer player)
+        {
+            try
+            {
+                return player != null &&
+                       player.PlaybackSession != null &&
+                       player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void PlaybackStateChanged(MediaPlaybackSession sender, object args)
+        {
+            try
+            {
+                if (sender.PlaybackState == MediaPlaybackState.Playing) { return; }
+                App.Log("Background keep-alive state " + sender.PlaybackState +
+                        "; reiniciando silencio.");
+                Restart();
+            }
+            catch (Exception ex)
+            {
+                App.Log("Background keep-alive state failed: " + ex.Message);
+            }
+        }
+
+        private static void MediaFailed(MediaPlayer sender, MediaPlayerFailedEventArgs args)
+        {
+            try
+            {
+                App.Log("Background keep-alive media failed: " + args.Error +
+                        (string.IsNullOrWhiteSpace(args.ErrorMessage)
+                            ? string.Empty
+                            : " · " + args.ErrorMessage));
+                Restart();
+            }
+            catch (Exception ex)
+            {
+                App.Log("Background keep-alive failure handler failed: " + ex.Message);
+            }
+        }
+
+        private static void Restart()
+        {
+            MediaPlayer player;
+            lock (Gate)
+            {
+                if ((DateTime.UtcNow - _lastRestartUtc).TotalSeconds < 5) { return; }
+                player = _player;
+                _player = null;
+                _started = false;
+            }
+            DisposePlayer(player);
+            Start();
         }
 
         public static void Stop()
@@ -57,9 +134,20 @@ namespace Plura.Services.Streaming.OnDevice
                 player = _player;
                 _player = null;
                 _started = false;
+                _lastRestartUtc = DateTime.MinValue;
             }
+            DisposePlayer(player);
+        }
 
+        private static void DisposePlayer(MediaPlayer player)
+        {
             if (player == null) { return; }
+            try
+            {
+                player.PlaybackSession.PlaybackStateChanged -= PlaybackStateChanged;
+                player.MediaFailed -= MediaFailed;
+            }
+            catch { }
             try
             {
                 player.Pause();

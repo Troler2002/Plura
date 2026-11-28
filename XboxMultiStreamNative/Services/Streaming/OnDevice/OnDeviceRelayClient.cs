@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.Core;
 using Windows.ApplicationModel.ExtendedExecution;
+using Windows.UI.Core;
 
 namespace Plura.Services.Streaming.OnDevice
 {
@@ -22,6 +24,7 @@ namespace Plura.Services.Streaming.OnDevice
             new Dictionary<string, OutputWorker>(StringComparer.OrdinalIgnoreCase);
 
         private CancellationTokenSource _runCts;
+        private Timer _healthTimer;
         private IDisposable _executionSession;
         private string _channel = string.Empty;
         private string _displayName = string.Empty;
@@ -30,7 +33,6 @@ namespace Plura.Services.Streaming.OnDevice
         private DateTime _startedAt;
         private int _generation;
         private bool _running;
-        private bool _executionRequesting;
         private bool _basicRequesting;
         private bool _executionDenied;
 
@@ -99,6 +101,7 @@ namespace Plura.Services.Streaming.OnDevice
             var titleToken = _runCts.Token;
             var ignoredTitleSync = Task.Run(() => TitleSyncLoopAsync(titleToken));
             var ignored = RequestExtendedExecutionAsync();
+            StartHealthTimer(_generation);
             App.Log("On-device relay started for " + login + " with " + deduped.Count + " outputs" +
                     (_title.Length > 0 ? " · title=\"" + _title + "\"" : string.Empty));
             return Snapshot();
@@ -106,6 +109,7 @@ namespace Plura.Services.Streaming.OnDevice
 
         public async Task<RelayStatus> StopAsync(CancellationToken token)
         {
+            StopHealthTimer();
             OutputWorker[] workers;
             CancellationTokenSource runCts;
             IDisposable session;
@@ -173,6 +177,9 @@ namespace Plura.Services.Streaming.OnDevice
 
             while (!token.IsCancellationRequested && generation == _generation)
             {
+                worker.Status.LastMediaUtc = DateTime.MinValue;
+                worker.VideoFrames = 0;
+
                 var publisher = new RtmpPublisher(
                     worker.Target.ServerUrl, worker.Target.StreamKey, GetTitle());
                 worker.Publisher = publisher;
@@ -188,6 +195,10 @@ namespace Plura.Services.Streaming.OnDevice
                     worker.Status.Error = string.Empty;
                     restarts = 0;
                     streamStarted = DateTime.UtcNow;
+                    lock (_gate)
+                    {
+                        if (!string.IsNullOrWhiteSpace(_globalError)) { _globalError = string.Empty; }
+                    }
 
                     await PushStreamAsync(publisher, worker, token, streamStarted.Value);
                 }
@@ -219,6 +230,14 @@ namespace Plura.Services.Streaming.OnDevice
                 {
                     publisher.Dispose();
                     worker.Publisher = null;
+                    // Las métricas de la conexión anterior no deben hacer creer
+                    // al supervisor que este destino sigue emitiendo.
+                    worker.Status.BitrateKbps = 0;
+                    worker.Status.Fps = 0;
+                    worker.Status.DurationSeconds = 0;
+                    worker.Status.LastMediaUtc = DateTime.MinValue;
+                    worker.VideoFrames = 0;
+                    if (worker.Status.State != "error") { worker.Status.State = "restarting"; }
                 }
             }
 
@@ -228,6 +247,7 @@ namespace Plura.Services.Streaming.OnDevice
                 worker.Status.BitrateKbps = 0;
                 worker.Status.Fps = 0;
                 worker.Status.DurationSeconds = 0;
+                worker.Status.LastMediaUtc = DateTime.MinValue;
             }
         }
 
@@ -237,7 +257,7 @@ namespace Plura.Services.Streaming.OnDevice
             var demuxer = new UnifiedDemuxer();
             string masterUrl = await _twitch.GetMasterPlaylistUrlAsync(_channel, token);
             string mediaUrl = await _twitch.GetMediaPlaylistUrlAsync(masterUrl, token);
-            DateTime tokenIssued = DateTime.UtcNow;
+            DateTime lastRefresh = DateTime.UtcNow;
 
             Uri lastSegment = null;
             Uri lastInit = null;
@@ -246,15 +266,21 @@ namespace Plura.Services.Streaming.OnDevice
             long lastBytes = 0;
             long lastFrames = 0;
             int segmentLogs = 0;
+            int segmentFailures = 0;
+            int noSegmentPolls = 0;
             DateTime lastStats = DateTime.UtcNow;
 
             while (!token.IsCancellationRequested)
             {
-                if ((DateTime.UtcNow - tokenIssued).TotalMinutes > 9)
+                if ((DateTime.UtcNow - lastRefresh).TotalMinutes > 9)
                 {
-                    masterUrl = await _twitch.GetMasterPlaylistUrlAsync(_channel, token);
-                    mediaUrl = await _twitch.GetMediaPlaylistUrlAsync(masterUrl, token);
-                    tokenIssued = DateTime.UtcNow;
+                    var refreshed = await TryRefreshPlaylistAsync(worker, token, "programada");
+                    if (refreshed != null)
+                    {
+                        masterUrl = refreshed.Master;
+                        mediaUrl = refreshed.Media;
+                        lastRefresh = DateTime.UtcNow;
+                    }
                 }
 
                 HlsPlaylist playlist;
@@ -262,11 +288,22 @@ namespace Plura.Services.Streaming.OnDevice
                 {
                     playlist = await _twitch.GetPlaylistAsync(mediaUrl, token);
                 }
-                catch (Exception)
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
                 {
-                    masterUrl = await _twitch.GetMasterPlaylistUrlAsync(_channel, token);
-                    mediaUrl = await _twitch.GetMediaPlaylistUrlAsync(masterUrl, token);
-                    tokenIssued = DateTime.UtcNow;
+                    App.Log("HLS playlist " + worker.Key + ": " + ex.Message);
+                    var refreshed = await TryRefreshPlaylistAsync(worker, token, "reintento");
+                    if (refreshed != null)
+                    {
+                        masterUrl = refreshed.Master;
+                        mediaUrl = refreshed.Media;
+                        lastRefresh = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        try { await Task.Delay(TimeSpan.FromSeconds(2), token); }
+                        catch (OperationCanceledException) { throw; }
+                    }
                     continue;
                 }
 
@@ -303,6 +340,7 @@ namespace Plura.Services.Streaming.OnDevice
                     }
                 }
 
+                bool sentAny = false;
                 for (int i = first; i < count && !token.IsCancellationRequested; i++)
                 {
                     byte[] segment;
@@ -310,12 +348,18 @@ namespace Plura.Services.Streaming.OnDevice
                     {
                         segment = await _twitch.GetSegmentAsync(playlist.Segments[i], token);
                     }
-                    catch (Exception)
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
                     {
-                        // Un segmento perdido no justifica cortar el relay; se
-                        // volverá a intentar en el siguiente sondeo.
+                        segmentFailures++;
+                        if (segmentFailures <= 3)
+                        {
+                            App.Log("HLS segment " + worker.Key + " failed: " + ex.Message);
+                        }
                         continue;
                     }
+                    segmentFailures = 0;
+                    sentAny = true;
 
                     var batch = new List<FlvMessage>();
                     demuxer.Feed(segment, batch.Add);
@@ -335,13 +379,30 @@ namespace Plura.Services.Streaming.OnDevice
                         modeLogged = true;
                     }
 
+                    bool hasMedia = false;
                     foreach (var message in batch)
                     {
                         await publisher.SendMediaAsync(message, token);
                         if (message.MessageType == 9) { worker.VideoFrames++; }
+                        if (message.MessageType == 8 || message.MessageType == 9) { hasMedia = true; }
                     }
+                    if (hasMedia) { worker.Status.LastMediaUtc = DateTime.UtcNow; }
 
                     lastSegment = playlist.Segments[i];
+                }
+
+                if (sentAny)
+                {
+                    noSegmentPolls = 0;
+                }
+                else
+                {
+                    noSegmentPolls++;
+                    if (noSegmentPolls >= 15)
+                    {
+                        throw new OnDeviceRelayException(
+                            "HLS: 15 sondeos consecutivos sin segmentos útiles.");
+                    }
                 }
 
                 var now = DateTime.UtcNow;
@@ -370,6 +431,37 @@ namespace Plura.Services.Streaming.OnDevice
                 }
                 catch (OperationCanceledException) { break; }
             }
+        }
+
+        /// <summary>
+        /// Renueva master/media del HLS con reintentos acotados. Un fallo aquí no
+        /// debe tumbar el worker: Twitch puede fallar puntualmente al refrescar
+        /// el token y el siguiente sondeo debe poder seguir.
+        /// </summary>
+        private async Task<PlaylistUrls> TryRefreshPlaylistAsync(
+            OutputWorker worker, CancellationToken token, string reason)
+        {
+            for (int attempt = 1; attempt <= 3 && !token.IsCancellationRequested; attempt++)
+            {
+                try
+                {
+                    var master = await _twitch.GetMasterPlaylistUrlAsync(_channel, token);
+                    var media = await _twitch.GetMediaPlaylistUrlAsync(master, token);
+                    return new PlaylistUrls { Master = master, Media = media };
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    App.Log("HLS refresh (" + reason + ", " + worker.Key + ") intent " +
+                            attempt + ": " + ex.Message);
+                    if (attempt < 3)
+                    {
+                        try { await Task.Delay(TimeSpan.FromSeconds(attempt), token); }
+                        catch (OperationCanceledException) { throw; }
+                    }
+                }
+            }
+            return null;
         }
 
         // ------------------------------------------------------------- título
@@ -484,10 +576,18 @@ namespace Plura.Services.Streaming.OnDevice
                     Restarts = worker.Status.Restarts,
                     BitrateKbps = worker.Status.BitrateKbps,
                     Fps = worker.Status.Fps,
-                    DurationSeconds = worker.Status.DurationSeconds
+                    DurationSeconds = worker.Status.DurationSeconds,
+                    LastMediaUtc = worker.Status.LastMediaUtc
                 };
                 status.Outputs.Add(output);
             }
+
+            status.Healthy = status.Running &&
+                             string.IsNullOrWhiteSpace(status.Error) &&
+                             status.Outputs.Count > 0 &&
+                             status.Outputs.All(o =>
+                                 string.IsNullOrWhiteSpace(o.Error) &&
+                                 !string.Equals(o.State, "error", StringComparison.OrdinalIgnoreCase));
 
             return status;
         }
@@ -512,6 +612,102 @@ namespace Plura.Services.Streaming.OnDevice
                 text = text.Replace(secret, "***");
             }
             return text;
+        }
+
+        // ------------------------------------------------ watchdog interno
+
+        private void StartHealthTimer(int generation)
+        {
+            StopHealthTimer();
+            var timer = new Timer(
+                state => { var ignored = SelfHealAsync(generation); },
+                null, TimeSpan.FromSeconds(12), TimeSpan.FromSeconds(12));
+            lock (_gate) { _healthTimer = timer; }
+        }
+
+        private void StopHealthTimer()
+        {
+            Timer timer;
+            lock (_gate)
+            {
+                timer = _healthTimer;
+                _healthTimer = null;
+            }
+            if (timer != null) { try { timer.Dispose(); } catch { } }
+        }
+
+        /// <summary>
+        /// Watchdog independiente del DispatcherTimer de la UI. Sustituye los
+        /// destinos muertos (o colgados sin media) aunque Xbox estrangule el
+        /// hilo de la interfaz mientras la app está en segundo plano.
+        /// </summary>
+        private async Task SelfHealAsync(int generation)
+        {
+            var stale = new List<OutputWorker>();
+            var replacements = new List<OutputWorker>();
+
+            try
+            {
+                lock (_gate)
+                {
+                    if (!_running || generation != _generation || _runCts == null) { return; }
+                    var token = _runCts.Token;
+                    stale.AddRange(_workers.Values.Where(IsWorkerUnhealthy));
+
+                    foreach (var worker in stale)
+                    {
+                        if ((DateTime.UtcNow - worker.LastSelfHealUtc).TotalSeconds < 20) { continue; }
+
+                        var replacement = new OutputWorker(worker.Target);
+                        replacement.Status.Platform = worker.Status.Platform;
+                        replacement.Status.State = "connecting";
+                        replacement.Cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                        replacement.LastSelfHealUtc = DateTime.UtcNow;
+                        _workers[worker.Key] = replacement;
+                        replacement.Task = Task.Run(
+                            () => RunOutputAsync(replacement, _generation, replacement.Cts.Token));
+                        replacements.Add(replacement);
+                    }
+
+                    if (replacements.Count == 0) { return; }
+                    _globalError = string.Empty;
+                }
+
+                foreach (var worker in stale)
+                {
+                    try { worker.Cts?.Cancel(); } catch { }
+                }
+                App.Log("Relay self-heal: " +
+                        string.Join(", ", replacements.Select(r => r.Key)));
+            }
+            catch (Exception ex)
+            {
+                App.Log("Relay self-heal failed: " + ex.Message);
+            }
+            await Task.FromResult(0);
+        }
+
+        private static bool IsWorkerUnhealthy(OutputWorker worker)
+        {
+            if (worker == null) { return false; }
+            var state = worker.Status.State ?? string.Empty;
+            if (string.Equals(state, "error", StringComparison.OrdinalIgnoreCase) ||
+                !string.IsNullOrWhiteSpace(worker.Status.Error))
+            {
+                return true;
+            }
+            if (!string.Equals(state, "running", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            if (worker.Publisher != null && !worker.Publisher.IsConnected) { return true; }
+
+            var now = DateTime.UtcNow;
+            if (worker.Status.LastMediaUtc == DateTime.MinValue)
+            {
+                return worker.Status.DurationSeconds > 60;
+            }
+            return (now - worker.Status.LastMediaUtc).TotalSeconds > 45;
         }
 
         // ----------------------------------------- ejecución en segundo plano
@@ -570,11 +766,13 @@ namespace Plura.Services.Streaming.OnDevice
                         if (ReferenceEquals(_executionSession, session)) { _executionSession = null; }
                     }
                     try { session.Dispose(); } catch { }
+                    ScheduleExtendedExecutionRetry(2);
                 };
 
                 var result = await session.RequestExtensionAsync();
                 App.Log("Basic extended execution: " + result);
                 bool stillRunning;
+                bool retry = false;
                 lock (_gate)
                 {
                     stillRunning = _running;
@@ -587,6 +785,7 @@ namespace Plura.Services.Streaming.OnDevice
                     else
                     {
                         _executionDenied = true;
+                        if (stillRunning) { retry = true; }
                     }
                 }
 
@@ -594,10 +793,12 @@ namespace Plura.Services.Streaming.OnDevice
                 {
                     try { session.Dispose(); } catch { }
                 }
+                if (retry) { ScheduleExtendedExecutionRetry(30); }
             }
             catch (Exception ex)
             {
                 App.Log("Basic extended execution failed: " + ex.Message);
+                ScheduleExtendedExecutionRetry(30);
             }
             finally
             {
@@ -605,10 +806,38 @@ namespace Plura.Services.Streaming.OnDevice
             }
         }
 
+        /// <summary>
+        /// La sesión básica puede denegarse o revocarse de forma transitoria.
+        /// Se reintenta en el hilo de la interfaz, que es donde Xbox la concede.
+        /// </summary>
+        private static void ScheduleExtendedExecutionRetry(int seconds)
+        {
+            try
+            {
+                var dispatcher = CoreApplication.MainView.CoreWindow.Dispatcher;
+                var ignored = dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+                {
+                    try { await Task.Delay(TimeSpan.FromSeconds(seconds)); }
+                    catch { }
+                    Current.EnsureExtendedExecution(true);
+                });
+            }
+            catch (Exception ex)
+            {
+                App.Log("Schedule extended execution retry failed: " + ex.Message);
+            }
+        }
+
         private static void ReleaseExtendedExecution(IDisposable session)
         {
             if (session == null) { return; }
             try { session.Dispose(); } catch { }
+        }
+
+        private sealed class PlaylistUrls
+        {
+            public string Master = string.Empty;
+            public string Media = string.Empty;
         }
 
         private sealed class OutputWorker
@@ -621,6 +850,7 @@ namespace Plura.Services.Streaming.OnDevice
             public Task Task;
             public RtmpPublisher Publisher;
             public long VideoFrames;
+            public DateTime LastSelfHealUtc = DateTime.MinValue;
 
             public OutputWorker(RelayTarget target)
             {

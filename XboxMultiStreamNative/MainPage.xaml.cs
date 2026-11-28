@@ -505,7 +505,14 @@ namespace Plura
 
                 // Supervisor: si hay una emisión guardada y el relay cayó,
                 // vuelve a levantarla en cuanto Twitch esté en vivo.
-                await AutoRestartRelayIfNeededAsync();
+                try
+                {
+                    await AutoRestartRelayIfNeededAsync();
+                }
+                catch (Exception ex)
+                {
+                    App.Log("Relay supervisor failed: " + ShortText(ex.Message, 220));
+                }
                 return;
             }
 
@@ -1117,10 +1124,11 @@ namespace Plura
             try
             {
                 var status = await _relay.GetStatusAsync(_relayCts.Token);
-                if (status != null && status.Running)
+                if (status != null && status.Running && IsRelayHealthy(status))
                 {
                     ApplyRelayStatus(status);
                     TrackRelayMedia(status);
+                    BackgroundKeepAlive.Start();
                     _relay.EnsureExtendedExecution(forceExecution);
                     if (!_pollTimer.IsEnabled) { _pollTimer.Start(); }
                     return;
@@ -1130,6 +1138,7 @@ namespace Plura
                     string.Join(", ", session.Targets));
                 _nextAutoStartUtc = DateTime.MinValue;
                 await AutoRestartRelayIfNeededAsync(true);
+                BackgroundKeepAlive.Start();
                 _relay.EnsureExtendedExecution(forceExecution);
                 if (!_pollTimer.IsEnabled) { _pollTimer.Start(); }
             }
@@ -1155,8 +1164,14 @@ namespace Plura
                 return;
             }
 
-            var flowing = status.Outputs != null &&
-                          status.Outputs.Any(o => o.BitrateKbps > 1 || o.Fps > 0);
+            var outputs = status.Outputs ?? new List<RelayOutputStatus>();
+            var flowing = outputs.Count > 0 &&
+                          string.IsNullOrWhiteSpace(status.Error) &&
+                          outputs.All(o =>
+                              string.Equals(o.State, "running", StringComparison.OrdinalIgnoreCase) &&
+                              string.IsNullOrWhiteSpace(o.Error) &&
+                              o.MediaFresh &&
+                              (o.BitrateKbps > 1 || o.Fps > 0));
             if (flowing)
             {
                 _noMediaSinceUtc = DateTime.MinValue;
@@ -1202,9 +1217,15 @@ namespace Plura
             ApplyRelayStatus(status);
             TrackRelayMedia(status);
 
+            var outputFailed = status != null && status.Outputs != null &&
+                               status.Outputs.Any(o =>
+                                   !string.IsNullOrWhiteSpace(o.Error) ||
+                                   string.Equals(o.State, "error", StringComparison.OrdinalIgnoreCase));
+            var relayFailed = status == null || !status.Running || outputFailed ||
+                              !string.IsNullOrWhiteSpace(status.Error);
             var stuck = _noMediaSinceUtc != DateTime.MinValue &&
                         (DateTime.UtcNow - _noMediaSinceUtc).TotalSeconds > 45;
-            if (status.Running && !stuck)
+            if (!relayFailed && !stuck)
             {
                 _autoStartFailures = 0;
                 _nextAutoStartUtc = DateTime.MinValue;
@@ -1213,15 +1234,16 @@ namespace Plura
 
             if (DateTime.UtcNow < _nextAutoStartUtc) { return; }
 
-            if (stuck)
-            {
-                App.Log("Relay sin media durante 45 s; reiniciando destinos.");
-                await _relay.StopAsync(_relayCts.Token);
-                ApplyRelayStatus(await _relay.GetStatusAsync(_relayCts.Token));
-                _noMediaSinceUtc = DateTime.MinValue;
-            }
+            App.Log(relayFailed
+                ? "Relay con error de salida; reiniciando destinos."
+                : "Relay sin media durante 45 s; reiniciando destinos.");
+            await _relay.StopAsync(_relayCts.Token);
+            ApplyRelayStatus(await _relay.GetStatusAsync(_relayCts.Token));
+            _noMediaSinceUtc = DateTime.MinValue;
 
-            var reason = stuck ? "reinicio por falta de media" : "reanudación automática";
+            var reason = stuck ? "reinicio por falta de media"
+                       : relayFailed ? "reinicio por error de salida"
+                       : "reanudación automática";
             App.Log("Auto-start relay (" + reason + "): " + session.Channel + " -> " +
                 string.Join(", ", session.Targets));
             _nextAutoStartUtc = DateTime.UtcNow.AddSeconds(
@@ -1240,6 +1262,9 @@ namespace Plura
 
         internal void ResumeAfterBackground()
         {
+            // El silencio de fondo puede haberse detenido al suspender: se
+            // rearma aquí también, no solo al entrar en segundo plano.
+            if (_relayRunning) { BackgroundKeepAlive.Start(); }
             if (_loaded && !_pollTimer.IsEnabled) { _pollTimer.Start(); }
             var ignored = RestoreRelaySessionAsync(true);
         }
@@ -1331,6 +1356,19 @@ namespace Plura
                 BackendStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 107, 122));
                 if (notify) { ShowMessage("Relay: " + ex.Message); }
             }
+        }
+
+        private static bool IsRelayHealthy(RelayStatus status)
+        {
+            if (status == null || !status.Running ||
+                !string.IsNullOrWhiteSpace(status.Error))
+            {
+                return false;
+            }
+            if (status.Outputs == null || status.Outputs.Count == 0) { return false; }
+            return status.Outputs.All(o =>
+                string.IsNullOrWhiteSpace(o.Error) &&
+                !string.Equals(o.State, "error", StringComparison.OrdinalIgnoreCase));
         }
 
         private void ApplyRelayStatus(RelayStatus status)

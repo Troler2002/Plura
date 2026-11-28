@@ -26,6 +26,17 @@ namespace Plura.Services.Streaming
         public double BitrateKbps { get; set; }
         public double Fps { get; set; }
         public int DurationSeconds { get; set; }
+        public DateTime LastMediaUtc { get; set; } = DateTime.MinValue;
+
+        /// <summary>Media real recibida en los últimos 15 segundos.</summary>
+        public bool MediaFresh
+        {
+            get
+            {
+                return LastMediaUtc != DateTime.MinValue &&
+                       (DateTime.UtcNow - LastMediaUtc).TotalSeconds <= 15;
+            }
+        }
 
         public bool IsSending
         {
@@ -42,6 +53,7 @@ namespace Plura.Services.Streaming
     public sealed class RelayStatus
     {
         public bool Running { get; set; }
+        public bool Healthy { get; set; }
         public string Channel { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;

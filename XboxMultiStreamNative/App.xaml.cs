@@ -115,6 +115,9 @@ namespace Plura
         private void App_UnhandledException(object sender, Windows.UI.Xaml.UnhandledExceptionEventArgs e)
         {
             Log("UnhandledException: " + e.Message + "\r\n" + Describe(e.Exception));
+            // Evita que una excepción aislada en un timer o en un handler async
+            // void cierre la app y corte el relay en segundo plano.
+            e.Handled = true;
         }
 
         private static string Describe(Exception ex)
